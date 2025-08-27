@@ -79,15 +79,26 @@ def load_example_config():
             'quantum_computing': {
                 'description': 'Quantum information processing and computing',
                 'cpc_codes': [
-                    {'code': 'G06N10', 'description': 'Quantum computing'},
-                    {'code': 'H04L9', 'description': 'Quantum cryptography'}
+                    # Class-level codes (broader coverage)
+                    {'code': 'G06N10', 'description': 'Quantum computing - all quantum algorithms'},
+                    {'code': 'H04L9', 'description': 'Cryptographic mechanisms including quantum'},
+                    # Subgroup-level codes (specific technologies)
+                    {'code': 'G06N10/20', 'description': 'Quantum algorithms for solving problems'},
+                    {'code': 'G06N10/60', 'description': 'Quantum error correction'},
+                    {'code': 'H04L9/0852', 'description': 'Quantum key distribution'}
                 ]
             },
             'artificial_intelligence': {
                 'description': 'Machine learning and AI technologies',
                 'cpc_codes': [
-                    {'code': 'G06N3', 'description': 'Neural networks'},
-                    {'code': 'G06N20', 'description': 'Machine learning'}
+                    # Class-level codes
+                    {'code': 'G06N3', 'description': 'Neural networks and computing systems'},
+                    {'code': 'G06N20', 'description': 'Machine learning'},
+                    {'code': 'G06F40', 'description': 'Natural language processing'},
+                    # Subgroup-level codes
+                    {'code': 'G06N3/04', 'description': 'Architecture of neural networks'},
+                    {'code': 'G06N3/08', 'description': 'Learning methods for neural networks'},
+                    {'code': 'G06F40/30', 'description': 'Semantic analysis in NLP'}
                 ]
             }
         },
