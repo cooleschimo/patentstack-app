@@ -668,12 +668,12 @@ def clean_and_deduplicate_data():
     """UI for cleaning and deduplicating patent data"""
     st.markdown("## 🧹 Step 3: Clean and Deduplicate Data")
     
-    # Option to upload previously saved cleaned data
-    st.markdown("### 📤 Upload Previously Cleaned Data (Optional)")
+    # Option to upload previously saved raw data
+    st.markdown("### 📤 Upload Raw Patent Data (Optional)")
     uploaded_file = st.file_uploader(
-        "Upload a cleaned patents CSV file to skip data fetching",
+        "Upload previously fetched raw patents CSV to skip API calls",
         type=['csv'],
-        help="If you've previously downloaded cleaned data, upload it here to go directly to ML classification"
+        help="If you've previously downloaded raw patent data from Step 2, upload it here to avoid re-fetching"
     )
     
     if uploaded_file is not None:
@@ -686,11 +686,10 @@ def clean_and_deduplicate_data():
                 st.error(f"Uploaded file is missing required columns: {missing_columns}")
                 st.info("Required columns: patent_id, title, abstract, assignee (optional)")
             else:
-                st.success(f"✅ Loaded {len(uploaded_df)} patents from uploaded file")
+                st.success(f"✅ Loaded {len(uploaded_df)} raw patents from uploaded file")
                 
-                # Store as cleaned data directly
-                st.session_state.cleaned_data = uploaded_df
-                st.session_state.fetched_data = uploaded_df  # Also store as fetched for compatibility
+                # Store as fetched data to be cleaned
+                st.session_state.fetched_data = uploaded_df
                 
                 # Show data summary
                 col1, col2, col3, col4 = st.columns(4)
@@ -713,11 +712,10 @@ def clean_and_deduplicate_data():
                     st.metric("Missing Abstracts", missing_abstracts)
                 
                 # Show sample data
-                with st.expander("Preview uploaded data"):
+                with st.expander("Preview uploaded raw data"):
                     st.dataframe(uploaded_df.head(10), use_container_width=True)
                 
-                st.info("💡 You can now skip to Step 4 to define classifications and run ML")
-                return st.session_state.cleaned_data
+                st.info("💡 Now proceed with data cleaning below")
                 
         except Exception as e:
             st.error(f"Error loading uploaded file: {str(e)}")
@@ -726,7 +724,7 @@ def clean_and_deduplicate_data():
     st.markdown("---")
     
     if st.session_state.fetched_data is None:
-        st.warning("Please fetch patent data first or upload a cleaned CSV file!")
+        st.warning("Please fetch patent data first or upload a raw patents CSV file!")
         return None
     
     df = st.session_state.fetched_data.copy()
@@ -1147,6 +1145,50 @@ def create_classification_ui():
     """UI for defining custom classifications"""
     st.markdown("## 🏷️ Step 4: Define Technology Stack Classifications")
     
+    # Option to upload cleaned data
+    st.markdown("### 📤 Upload Cleaned Patent Data (Optional)")
+    uploaded_file = st.file_uploader(
+        "Upload previously cleaned patents CSV to skip data fetching and cleaning",
+        type=['csv'],
+        key="cleaned_upload",
+        help="If you've previously downloaded cleaned patent data from Step 3, upload it here"
+    )
+    
+    if uploaded_file is not None:
+        try:
+            uploaded_df = pd.read_csv(uploaded_file)
+            required_columns = ['patent_id', 'title', 'abstract']
+            missing_columns = [col for col in required_columns if col not in uploaded_df.columns]
+            
+            if missing_columns:
+                st.error(f"Uploaded file is missing required columns: {missing_columns}")
+                st.info("Required columns: patent_id, title, abstract")
+            else:
+                st.success(f"✅ Loaded {len(uploaded_df)} cleaned patents from uploaded file")
+                
+                # Store as cleaned data
+                st.session_state.cleaned_data = uploaded_df
+                st.session_state.fetched_data = uploaded_df  # Also store for compatibility
+                
+                # Show summary
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Total Patents", len(uploaded_df))
+                with col2:
+                    companies = uploaded_df['assignee'].nunique() if 'assignee' in uploaded_df.columns else "N/A"
+                    st.metric("Companies", companies)
+                with col3:
+                    missing = uploaded_df['abstract'].isna().sum()
+                    st.metric("Missing Abstracts", missing)
+                
+                with st.expander("Preview uploaded data"):
+                    st.dataframe(uploaded_df.head(10), use_container_width=True)
+                
+        except Exception as e:
+            st.error(f"Error loading file: {str(e)}")
+    
+    st.markdown("---")
+    
     # Use cleaned data if available, otherwise use fetched data
     if st.session_state.cleaned_data is not None:
         df = st.session_state.cleaned_data
@@ -1155,7 +1197,7 @@ def create_classification_ui():
         df = st.session_state.fetched_data
         st.warning("Using uncleaned data. Consider cleaning first for better results!")
     else:
-        st.warning("Please fetch patent data first!")
+        st.warning("Please fetch patent data first or upload a cleaned CSV file!")
         return None
     
     # Define two-tier classification hierarchy
@@ -1632,43 +1674,6 @@ def main():
     """Main application"""
     st.title("🔬 PatentStack")
     st.markdown("### Classify patents into technology stack categories")
-    st.markdown("---")
-    
-    # Quick start option
-    with st.expander("⚡ Quick Start - Upload Cleaned Data", expanded=False):
-        st.info("Have a cleaned CSV from a previous session? Upload it here to skip data fetching!")
-        quick_upload = st.file_uploader(
-            "Upload cleaned patents CSV",
-            type=['csv'],
-            key="quick_upload",
-            help="Required columns: patent_id, title, abstract"
-        )
-        
-        if quick_upload is not None:
-            try:
-                df = pd.read_csv(quick_upload)
-                required_cols = ['patent_id', 'title', 'abstract']
-                if all(col in df.columns for col in required_cols):
-                    st.session_state.cleaned_data = df
-                    st.session_state.fetched_data = df
-                    st.success(f"✅ Loaded {len(df)} patents! Go to Step 4 to classify.")
-                    
-                    # Show quick stats
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("Patents", len(df))
-                    with col2:
-                        companies = df['assignee'].nunique() if 'assignee' in df.columns else "N/A"
-                        st.metric("Companies", companies)
-                    with col3:
-                        missing = df['abstract'].isna().sum()
-                        st.metric("Missing Abstracts", missing)
-                else:
-                    st.error(f"Missing required columns. Found: {list(df.columns)}")
-                    st.info("Required: patent_id, title, abstract")
-            except Exception as e:
-                st.error(f"Error loading file: {str(e)}")
-    
     st.markdown("---")
     
     # Sidebar navigation
