@@ -121,35 +121,40 @@ class USPTOPatentPuller:
     
     def __init__(self, cpc_parser: CPCParser, api_key: str | None = None):
         self.cpc_parser = cpc_parser
-        if api_key:
-            self.api_key: str = api_key
-        else:
-            self.api_key: str = self._get_api_key()
+        self.api_key: str | None = api_key
         
         # PatentsView API settings
         self.base_url: str = "https://search.patentsview.org/api/v1"
         self.patents_endpoint: str = f"{self.base_url}/patent/"
         self.rate_limit_delay: float = 1.4 # rate limit: 45 requests/minute = 0.75 requests/second
-        self.headers: dict[str, str] = {
-            'X-Api-Key': self.api_key,
-            'Content-Type': 'application/json'
-        }
 
     def _get_api_key(self) -> str:
         """
-        Get API key from environment variable or configuration.
+        Get API key from instance variable, environment, or raise error.
         """
+        # First check if we have an API key stored
+        if self.api_key and self.api_key.strip():
+            return self.api_key
+        
+        # Try environment variable
         api_key: str | None = os.getenv('PATENTSVIEW_API_KEY')
         if api_key:
             return api_key
        
-        logger.error("PatentsView API key not found in environment variables.\n")
+        logger.error("PatentsView API key not found.\n")
         raise ValueError(
             "\nRequired setup:\n"
-            "Create a .env file in your project root with:\n"
+            "Either provide API key in the app UI or create a .env file with:\n"
             "PATENTSVIEW_API_KEY=your_actual_api_key_here\n"
             "\nGet API key from: https://www.patentsview.org/api/keyrequest"
         )
+    
+    def _get_headers(self) -> dict[str, str]:
+        """Get request headers with API key."""
+        return {
+            'X-Api-Key': self._get_api_key(),
+            'Content-Type': 'application/json'
+        }
         
     def _build_search_query(self, companies: list[str], domains: list[str], 
                         start_date: str, end_date: str) -> dict[str, Any]:
@@ -328,7 +333,7 @@ class USPTOPatentPuller:
             response = requests.post(
                 self.patents_endpoint,
                 json=query,
-                headers=self.headers,
+                headers=self._get_headers(),
                 timeout=30
             )
 
@@ -340,7 +345,7 @@ class USPTOPatentPuller:
                 response = requests.post(
                     self.patents_endpoint,
                     json=query,
-                    headers=self.headers
+                    headers=self._get_headers()
                     )
             elif response.status_code == 403:
                 logger.error("API authentication failed, check your API key.")
@@ -469,7 +474,7 @@ class USPTOPatentPuller:
             try: 
                 time.sleep(self.rate_limit_delay)
                 
-                response = requests.post(endpoint, json=query, headers=self.headers, timeout=30)
+                response = requests.post(endpoint, json=query, headers=self._get_headers(), timeout=30)
                 response.raise_for_status()
                 
                 json_response = response.json()
@@ -1031,7 +1036,11 @@ class HybridPatentPuller:
 ### MAIN FUNCTION ##############################################################
 def main() -> None:
     """Command-line interface for the hybrid patent puller."""
-    load_dotenv('../../.env')
+    # Load from .env if available (for command-line usage)
+    try:
+        load_dotenv('../../.env')
+    except:
+        pass
 
     parser = argparse.ArgumentParser(
         description='Patent Data Fetcher - Pull patent data from USPTO and BigQuery',
