@@ -991,14 +991,29 @@ def create_classification_ui():
     
     # ML Classification settings
     st.markdown("### Classification Settings")
-    ml_threshold = st.slider(
-        "ML Similarity Threshold",
-        min_value=0.1,
-        max_value=0.5,
-        value=0.25,
-        step=0.05,
-        help="BERT similarities are typically lower than expected. 0.25-0.35 works best for patent classification. Lower = more inclusive, Higher = stricter."
-    )
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        ml_threshold = st.slider(
+            "ML Similarity Threshold",
+            min_value=0.15,
+            max_value=0.60,
+            value=0.30,  # Corrected based on actual normalized BERT ranges
+            step=0.05,
+            help="Recommended: 0.30 for balanced results, 0.25 for broader coverage, 0.35 for higher precision. Even with normalization, BERT similarities are lower than expected."
+        )
+    
+    with col2:
+        st.info("""
+        **📊 Real BERT Similarity Ranges:**
+        - **0.20-0.25**: Loosely related
+        - **0.25-0.30**: Related technology
+        - **0.30-0.35**: Strong match ✓
+        - **0.35-0.40**: Very similar
+        - **0.40+**: Nearly identical
+        
+        💡 Even normalized, BERT gives lower scores
+        """)
     
     # Cache the model loading function
     @st.cache_resource
@@ -1027,7 +1042,18 @@ def create_classification_ui():
         raise Exception("Could not load any BERT model. Please check your internet connection.")
     
     # Apply classification using ML
-    if st.button("🎯 Apply ML Classification", type="primary"):
+    with st.expander("ℹ️ How Self-Learning Classification Works"):
+        st.markdown("""
+        **Adaptive Learning Process:**
+        1. **Initial Phase**: Uses keyword similarities to classify first patents
+        2. **Learning Phase**: Each confident classification becomes a reference point
+        3. **Mature Phase**: New patents are compared to both keywords AND previously classified patents
+        4. **Result**: The model gets better at recognizing patterns specific to your domain as it processes more patents
+        
+        **No manual labeling needed!** The system learns from its own high-confidence predictions.
+        """)
+    
+    if st.button("🎯 Apply ML Classification with Self-Learning", type="primary"):
         with st.spinner("Loading ML model... This may take a moment on first run."):
             try:
                 import torch
@@ -1048,24 +1074,44 @@ def create_classification_ui():
                                       truncation=True, padding=True)
                     with torch.no_grad():
                         outputs = model(**inputs)
-                    return outputs.last_hidden_state[:, 0, :].numpy()
+                    
+                    # IMPORTANT: Use mean pooling instead of just [CLS] token for better similarity
+                    # Mean pooling: average all token embeddings (except padding)
+                    token_embeddings = outputs.last_hidden_state
+                    attention_mask = inputs['attention_mask']
+                    
+                    # Expand attention mask for broadcasting
+                    input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+                    
+                    # Sum embeddings for non-padding tokens
+                    sum_embeddings = torch.sum(token_embeddings * input_mask_expanded, 1)
+                    sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+                    
+                    # Calculate mean
+                    mean_pooled = sum_embeddings / sum_mask
+                    
+                    # Normalize for better cosine similarity
+                    normalized = torch.nn.functional.normalize(mean_pooled, p=2, dim=1)
+                    
+                    return normalized.numpy()
                 
                 st.success("✅ Model loaded successfully!")
                 
                 # Pre-compute keyword embeddings - use multiple embeddings per category
                 st.info("Computing keyword embeddings for each category...")
                 keyword_embeddings = {}
+                category_patent_embeddings = {}  # Store embeddings of classified patents
+                
                 for key, keywords in keyword_mappings.items():
                     if keywords:
-                        # Method 1: Individual keyword embeddings (better for diverse concepts)
+                        # Start with keyword embeddings
                         embeddings = []
                         for keyword in keywords[:10]:  # Limit to top 10 keywords to avoid memory issues
                             embeddings.append(get_embedding(keyword))
                         keyword_embeddings[key] = embeddings
                         
-                        # Method 2: Combined text (alternative - commented out)
-                        # keyword_text = " ".join(keywords)
-                        # keyword_embeddings[key] = [get_embedding(keyword_text)]
+                        # Initialize empty list for patents that will be classified into this category
+                        category_patent_embeddings[key] = []
                 
                 # Classify patents
                 classified_df = df.copy()
@@ -1093,14 +1139,30 @@ def create_classification_ui():
                         best_score = ml_threshold  # Use user-selected threshold
                         
                         for key, keyword_embs in keyword_embeddings.items():
-                            # Calculate max similarity across all keyword embeddings for this category
-                            max_similarity = 0
+                            # Calculate similarity with keyword embeddings
+                            max_keyword_similarity = 0
                             for keyword_emb in keyword_embs:
                                 similarity = cosine_similarity(patent_embedding, keyword_emb)[0][0]
-                                max_similarity = max(max_similarity, similarity)
+                                max_keyword_similarity = max(max_keyword_similarity, similarity)
                             
-                            if max_similarity > best_score:
-                                best_score = max_similarity
+                            # LEARNING: Also check similarity with previously classified patents in this category
+                            max_patent_similarity = 0
+                            if category_patent_embeddings[key]:  # If we have classified patents
+                                for patent_emb in category_patent_embeddings[key]:
+                                    similarity = cosine_similarity(patent_embedding, patent_emb)[0][0]
+                                    max_patent_similarity = max(max_patent_similarity, similarity)
+                            
+                            # Combine both similarities (weighted average)
+                            # As we classify more patents, patent similarity becomes more important
+                            n_classified = len(category_patent_embeddings[key])
+                            patent_weight = min(0.7, n_classified * 0.1)  # Up to 70% weight for patent similarity
+                            keyword_weight = 1.0 - patent_weight
+                            
+                            final_similarity = (keyword_weight * max_keyword_similarity + 
+                                              patent_weight * max_patent_similarity)
+                            
+                            if final_similarity > best_score:
+                                best_score = final_similarity
                                 best_match = key
                         
                         if best_match:
@@ -1113,6 +1175,13 @@ def create_classification_ui():
                                 classified_df.at[idx, 'subcategory'] = ''
                             classified_df.at[idx, 'confidence'] = float(best_score)
                             classifications_made += 1
+                            
+                            # LEARNING STEP: Add this patent's embedding to the category
+                            # Only add high-confidence classifications to avoid drift
+                            if best_score > ml_threshold + 0.05:  # Higher threshold for learning
+                                # Limit stored embeddings to prevent memory issues
+                                if len(category_patent_embeddings[best_match]) < 20:
+                                    category_patent_embeddings[best_match].append(patent_embedding)
                         
                         # Debug: Show scores for first few patents
                         if idx < 3:
@@ -1120,13 +1189,19 @@ def create_classification_ui():
                 
                 progress_bar.progress(1.0)
                 
-                # Show debug information
+                # Show debug information and learning progress
                 if similarity_scores:
-                    with st.expander("🔍 Debug: Similarity Scores"):
+                    with st.expander("🔍 Debug: Classification & Learning Progress"):
                         for score_info in similarity_scores[:5]:
                             st.write(score_info)
                         st.info(f"Total classified: {classifications_made}/{total_patents}")
                         st.info(f"Threshold used: {ml_threshold}")
+                        
+                        # Show how many patents were learned from each category
+                        st.write("**Learning Progress (patents added as references):**")
+                        for key, embeddings in category_patent_embeddings.items():
+                            if embeddings:
+                                st.write(f"- {key}: {len(embeddings)} reference patents learned")
                 
             except ImportError:
                 st.error("Please install required packages: pip install transformers torch scikit-learn")
