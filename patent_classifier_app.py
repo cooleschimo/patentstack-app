@@ -136,20 +136,77 @@ def create_api_configuration():
         st.session_state.api_keys['google_project_id'] = google_project
         
         if google_project:
-            # Google authentication options
-            auth_method = st.radio(
-                "Google Authentication Method",
-                ["Use Service Account JSON", "Use Application Default Credentials"],
-                help="Choose how to authenticate with Google Cloud"
-            )
+            # Check if running on Streamlit Cloud with secrets
+            has_streamlit_secrets = False
+            try:
+                if 'gcp_service_account' in st.secrets:
+                    has_streamlit_secrets = True
+                    # Use Streamlit secrets
+                    try:
+                        from google.oauth2 import service_account
+                        credentials = service_account.Credentials.from_service_account_info(
+                            st.secrets["gcp_service_account"],
+                            scopes=["https://www.googleapis.com/auth/cloud-platform"]
+                        )
+                        st.session_state.api_keys['google_credentials'] = credentials
+                        st.success("✅ Using Streamlit Cloud secrets for authentication")
+                    except Exception as e:
+                        st.error(f"Error using Streamlit secrets: {e}")
+                        has_streamlit_secrets = False
+            except:
+                pass
             
-            if auth_method == "Use Service Account JSON":
-                uploaded_file = st.file_uploader(
+            if not has_streamlit_secrets:
+                # Google authentication options
+                auth_method = st.radio(
+                    "Google Authentication Method",
+                    ["Paste Service Account JSON", "Upload Service Account JSON File", "Use Public BigQuery (Limited)"],
+                    help="Choose how to authenticate with Google Cloud"
+                )
+            
+                if auth_method == "Paste Service Account JSON":
+                    st.info("📋 Paste your service account JSON content below")
+                json_input = st.text_area(
+                    "Service Account JSON",
+                    height=200,
+                    placeholder='{\n  "type": "service_account",\n  "project_id": "your-project",\n  ...\n}',
+                    help="Paste the entire contents of your service account JSON file"
+                )
+                
+                    if json_input:
+                    try:
+                        # Import Google auth libraries
+                        try:
+                            from google.oauth2 import service_account
+                        except ImportError:
+                            st.error("Google Cloud libraries not installed. Run: pip install google-cloud-bigquery")
+                            st.session_state.api_keys['google_credentials'] = None
+                            return False
+                        
+                        # Parse the JSON
+                        credentials_dict = json.loads(json_input)
+                        
+                        # Create credentials object
+                        credentials = service_account.Credentials.from_service_account_info(
+                            credentials_dict,
+                            scopes=["https://www.googleapis.com/auth/cloud-platform"]
+                        )
+                        st.session_state.api_keys['google_credentials'] = credentials
+                        st.success("✅ Google credentials loaded successfully!")
+                    except json.JSONDecodeError:
+                        st.error("Invalid JSON format. Please paste valid service account JSON.")
+                        st.session_state.api_keys['google_credentials'] = None
+                    except Exception as e:
+                        st.error(f"Error loading credentials: {e}")
+                        st.session_state.api_keys['google_credentials'] = None
+            
+                elif auth_method == "Upload Service Account JSON File":
+                    uploaded_file = st.file_uploader(
                     "Upload Service Account JSON",
                     type=['json'],
                     help="Upload your Google Cloud service account credentials JSON file"
                 )
-                if uploaded_file:
+                    if uploaded_file:
                     try:
                         # Import Google auth libraries
                         try:
@@ -172,9 +229,71 @@ def create_api_configuration():
                     except Exception as e:
                         st.error(f"Error loading credentials: {e}")
                         st.session_state.api_keys['google_credentials'] = None
-            else:
-                st.info("ℹ️ Using Application Default Credentials. Make sure you have run 'gcloud auth application-default login' on your machine.")
+            
+                else:  # Use Public BigQuery
+                st.warning("⚠️ Using public BigQuery access has limitations and may not work for all queries")
+                st.info("For full access, please use a service account")
                 st.session_state.api_keys['google_credentials'] = None
+            
+                # Instructions on how to get service account
+                with st.expander("📖 How to get a Service Account JSON for BigQuery"):
+                    st.markdown("""
+                    ### Quick Setup Guide:
+                    
+                    1. **Go to Google Cloud Console**: https://console.cloud.google.com
+                    
+                    2. **Create or select a project**:
+                       - Click the project dropdown at the top
+                       - Click "New Project" if needed
+                       - Name it (e.g., "patent-analysis")
+                    
+                    3. **Enable BigQuery API**:
+                       - Go to **APIs & Services** → **Enable APIs and Services**
+                       - Search for **"BigQuery API"**
+                       - Click on it and press **Enable**
+                    
+                    4. **Create Service Account** (via API Credentials):
+                       - Go to **APIs & Services** → **Credentials**
+                       - Click **"+ CREATE CREDENTIALS"** → **Service Account**
+                       - When asked "Which API are you using?" → Select **BigQuery API**
+                       - When asked "What data will you be accessing?" → Select **Application data**
+                       - Fill in service account details:
+                         - Name: `patent-app-service-account` (or any name)
+                         - ID: (auto-generated)
+                         - Description: "Service account for patent app BigQuery access"
+                       - Click **CREATE AND CONTINUE**
+                    
+                    5. **Grant Permissions**:
+                       - In "Grant this service account access" step
+                       - Select role: **BigQuery User** (or BigQuery Data Viewer for read-only)
+                       - Click **CONTINUE** → **DONE**
+                    
+                    6. **Create and Download JSON Key**:
+                       - Find your new service account in the list
+                       - Click on it (email link)
+                       - Go to **Keys** tab
+                       - Click **ADD KEY** → **Create new key**
+                       - Select **JSON** format
+                       - Click **CREATE**
+                       - **Save the downloaded JSON file securely!**
+                    
+                    7. **Use in this app**:
+                       - Either **paste** the JSON contents in the text area above
+                       - Or **upload** the JSON file
+                    
+                    ### Important Notes:
+                    - ✅ Select **"Application data"** when creating credentials (not "User data")
+                    - ✅ The service account needs **BigQuery User** or **BigQuery Data Viewer** role
+                    - ⚠️ Keep your JSON key secure - it's like a password!
+                    - ⚠️ Never commit it to GitHub or share publicly
+                    - 💡 You can create multiple keys if needed
+                    - 💡 You can revoke keys anytime from the Console
+                    
+                    ### Troubleshooting:
+                    - **"Permission denied"**: Make sure the service account has BigQuery User role
+                    - **"API not enabled"**: Enable BigQuery API in your project
+                    - **"Invalid JSON"**: Make sure you're pasting the entire JSON content
+                    """)
     
     if not uspto_key and not google_project:
         st.warning("⚠️ At least one API configuration is required to fetch patents")
@@ -374,12 +493,20 @@ def fetch_patent_data():
             
             # Initialize fetcher with API keys from session state
             cpc_parser = CPCParser(str(config_path))
-            puller = HybridPatentPuller(
-                cpc_parser,
-                uspto_api_key=st.session_state.api_keys['uspto_key'] if st.session_state.api_keys['uspto_key'] else None,
-                google_project_id=st.session_state.api_keys['google_project_id'] if st.session_state.api_keys['google_project_id'] else None,
-                google_credentials=st.session_state.api_keys.get('google_credentials')
-            )
+            try:
+                puller = HybridPatentPuller(
+                    cpc_parser,
+                    uspto_api_key=st.session_state.api_keys['uspto_key'] if st.session_state.api_keys['uspto_key'] else None,
+                    google_project_id=st.session_state.api_keys['google_project_id'] if st.session_state.api_keys['google_project_id'] else None,
+                    google_credentials=st.session_state.api_keys.get('google_credentials')
+                )
+            except ValueError as e:
+                if "authentication" in str(e).lower():
+                    st.error(f"🔐 Google Cloud Authentication Error: {str(e)}")
+                    st.info("Please go back to Step 1 and either upload a service account JSON file or ensure you have run 'gcloud auth application-default login'")
+                    return None
+                else:
+                    raise e
             
             # Get parameters
             companies = st.session_state.cpc_config['user_inputs']['companies']

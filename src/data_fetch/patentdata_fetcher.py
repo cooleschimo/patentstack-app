@@ -672,21 +672,45 @@ class GooglePatentPuller:
         """Lazy initialization of BigQuery client."""
         if self.client is None:
             try:
+                import os
+                # Disable metadata server for local environments
+                os.environ['GCE_METADATA_HOST'] = '127.0.0.1'
+                
                 if self.credentials:
                     # Use provided credentials
                     self.client = bigquery.Client(project=self.project_id, credentials=self.credentials)
                     logger.info(f"BigQuery client initialized with provided credentials for project: {self.project_id}")
                 else:
-                    # Try to use application default credentials
-                    self.client = bigquery.Client(project=self.project_id)
-                    logger.info(f"BigQuery client initialized with default credentials for project: {self.project_id}")
+                    # Check for application default credentials
+                    from google.auth import default
+                    from google.auth.exceptions import DefaultCredentialsError
+                    
+                    try:
+                        # Try to get default credentials
+                        creds, project = default()
+                        self.client = bigquery.Client(project=self.project_id, credentials=creds)
+                        logger.info(f"BigQuery client initialized with application default credentials for project: {self.project_id}")
+                    except DefaultCredentialsError:
+                        raise ValueError(
+                            "\n⚠️ Google Cloud authentication required. Please either:\n"
+                            "1. Upload a service account JSON file in the app UI, OR\n"
+                            "2. Run 'gcloud auth application-default login' in your terminal, OR\n"
+                            "3. Set GOOGLE_APPLICATION_CREDENTIALS environment variable to point to your service account JSON file\n"
+                        )
             except Exception as e:
                 logger.error(f"Failed to initialize BigQuery client: {e}")
-                raise ValueError(
-                    f"Failed to initialize BigQuery client. \n"
-                    f"Please authenticate with Google Cloud or provide credentials.\n"
-                    f"Error: {e}"
-                )
+                if "metadata" in str(e).lower():
+                    raise ValueError(
+                        "\n⚠️ Google Cloud authentication required. Please either:\n"
+                        "1. Upload a service account JSON file in the app UI, OR\n"
+                        "2. Run 'gcloud auth application-default login' in your terminal\n"
+                        f"\nError: {e}"
+                    )
+                else:
+                    raise ValueError(
+                        f"Failed to initialize BigQuery client. \n"
+                        f"Error: {e}"
+                    )
         return self.client
 
     def _build_intl_query(self, companies: list[str],
@@ -937,10 +961,17 @@ class HybridPatentPuller:
         if google_project_id and google_project_id.strip():
             try:
                 self.bigquery_puller = GooglePatentPuller(cpc_parser, project_id=google_project_id, credentials=google_credentials)
-                logger.info("BigQuery initialized for international patents")
+                if google_credentials:
+                    logger.info("✅ BigQuery initialized with provided credentials for international patents")
+                else:
+                    logger.info("✅ BigQuery initialized for international patents")
+            except ValueError as e:
+                # Authentication/configuration errors - show to user
+                logger.error(f"BigQuery configuration error: {e}")
+                raise e
             except Exception as e:
-                logger.warning(f"BigQuery initialization skipped: {e}")
-                logger.info("Continuing with USPTO data only")
+                # Other errors - continue without BigQuery
+                logger.warning(f"BigQuery initialization failed, continuing with USPTO only: {e}")
                 self.bigquery_puller = None
         else:
             logger.info("No Google project ID provided, using USPTO data only")
