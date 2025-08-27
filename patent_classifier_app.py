@@ -78,33 +78,27 @@ def load_example_config():
     example_config = {
         'domains': {
             'quantum_computing': {
-                'description': 'Quantum information processing and computing',
+                'description': 'Information processing based on quantum-mechanical phenomena',
                 'cpc_codes': [
-                    # Class-level codes (broader coverage)
-                    {'code': 'G06N10', 'description': 'Quantum computing - all quantum algorithms'},
-                    {'code': 'H04L9', 'description': 'Cryptographic mechanisms including quantum'},
-                    # Subgroup-level codes (specific technologies)
-                    {'code': 'G06N10/20', 'description': 'Quantum algorithms for solving problems'},
-                    {'code': 'G06N10/60', 'description': 'Quantum error correction'},
-                    {'code': 'H04L9/0852', 'description': 'Quantum key distribution'}
-                ]
-            },
-            'artificial_intelligence': {
-                'description': 'Machine learning and AI technologies',
-                'cpc_codes': [
-                    # Class-level codes
-                    {'code': 'G06N3', 'description': 'Neural networks and computing systems'},
-                    {'code': 'G06N20', 'description': 'Machine learning'},
-                    {'code': 'G06F40', 'description': 'Natural language processing'},
-                    # Subgroup-level codes
-                    {'code': 'G06N3/04', 'description': 'Architecture of neural networks'},
-                    {'code': 'G06N3/08', 'description': 'Learning methods for neural networks'},
-                    {'code': 'G06F40/30', 'description': 'Semantic analysis in NLP'}
+                    # Primary quantum computing codes
+                    {'code': 'G06N10/20', 'description': 'Models of quantum computing, e.g. quantum circuits or universal quantum computers'},
+                    {'code': 'G06N10/40', 'description': 'Physical realisations or architectures of quantum processors or components for manipulating qubits'},
+                    {'code': 'G06N10/60', 'description': 'Quantum algorithms, e.g. based on quantum optimisation, quantum Fourier or Hadamard transforms'},
+                    {'code': 'G06N10/70', 'description': 'Quantum error correction, detection or prevention, e.g. surface codes or magic state distillation'},
+                    {'code': 'G06N10/80', 'description': 'Quantum programming, e.g. interfaces, languages or software-development kits'},
+                    # Additional relevant codes
+                    {'code': 'G06N10', 'description': 'Quantum computing (general)'},
+                    {'code': 'H04L9/0852', 'description': 'Quantum key distribution'},
+                    {'code': 'H04B10/70', 'description': 'Quantum communication'},
+                    {'code': 'H01L39/24', 'description': 'Josephson junction devices'},
+                    {'code': 'H01L39/22', 'description': 'Superconducting devices with potential barriers'},
+                    {'code': 'G01R33/035', 'description': 'NMR quantum computing arrangements'},
+                    {'code': 'B82Y10', 'description': 'Nanotechnology for quantum computing'}
                 ]
             }
         },
         'user_inputs': {
-            'companies': ['IBM', 'Google', 'Microsoft'],
+            'companies': ['International Business Machines', 'IBM', 'Google'],
             'date_range': {'start_year': 2020, 'end_year': 2024}
         }
     }
@@ -1201,13 +1195,27 @@ def create_classification_ui():
         return None
     
     # Define two-tier classification hierarchy
-    st.markdown("### Two-Tier Technology Stack Hierarchy")
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.markdown("### Two-Tier Technology Stack Hierarchy")
+    with col2:
+        if st.button("Load Quantum Example", key="load_quantum_example"):
+            # Load quantum computing example classification
+            st.session_state.quantum_example_loaded = True
+            st.rerun()
     
     # Tier 1: Main Tech Stack Categories
     st.markdown("#### Tier 1: Main Technology Categories")
+    
+    # Use quantum example if button was clicked
+    if hasattr(st.session_state, 'quantum_example_loaded') and st.session_state.quantum_example_loaded:
+        default_tech_stacks = "hardware\nmiddleware\nsoftware"
+    else:
+        default_tech_stacks = "hardware\nsoftware\nmiddleware"
+    
     tech_stack_input = st.text_area(
         "Define main technology categories (one per line)",
-        value="hardware\nsoftware\nmiddleware",
+        value=default_tech_stacks,
         height=100
     )
     tech_stacks = [t.strip() for t in tech_stack_input.split('\n') if t.strip()]
@@ -1228,9 +1236,27 @@ def create_classification_ui():
     for tech_stack in tech_stacks:
         with st.expander(f"📂 Configure '{tech_stack}' subcategories", expanded=True):
             subcat_key = f"subcat_{tech_stack}"
+            
+            # Set default subcategories based on quantum example
+            default_subcats = ""
+            if hasattr(st.session_state, 'quantum_example_loaded') and st.session_state.quantum_example_loaded:
+                if tech_stack == "hardware":
+                    default_subcats = "quantum_processing_unit\ncontrol_systems\nancillary_components"
+                elif tech_stack == "middleware":
+                    default_subcats = "hybrid_system_software\nsoftware_development_kits\ncompilers\nquantum_error_correction"
+                elif tech_stack == "software":
+                    default_subcats = "algorithms\napplications"
+            
+            # Check if we already have subcategories stored
+            if tech_stack in st.session_state.classifications.get('subcategories', {}):
+                current_subcats = st.session_state.classifications['subcategories'][tech_stack]
+                if current_subcats:
+                    default_subcats = "\n".join(current_subcats)
+            
             subcats_text = st.text_area(
                 f"Subcategories for {tech_stack} (one per line)",
                 key=subcat_key,
+                value=default_subcats,
                 height=150,
                 placeholder="e.g., processors, memory, sensors"
             )
@@ -1240,15 +1266,40 @@ def create_classification_ui():
     # Keyword-based classification
     st.markdown("### Keywords for Classification")
     
+    if hasattr(st.session_state, 'quantum_example_loaded') and st.session_state.quantum_example_loaded:
+        st.info("💡 For comprehensive quantum computing keywords, check `config/quantum_classification_keywords.yaml`")
+    
     keyword_mappings = {}
     for tech_stack in tech_stacks:
         for subcat in st.session_state.classifications['subcategories'].get(tech_stack, []):
             key = f"{tech_stack}_{subcat}"
             with st.expander(f"🔑 Keywords for {tech_stack} → {subcat}"):
+                # Load some example keywords for quantum computing
+                example_keywords = ""
+                if hasattr(st.session_state, 'quantum_example_loaded') and st.session_state.quantum_example_loaded:
+                    if key == "hardware_quantum_processing_unit":
+                        example_keywords = "superconducting qubit\ntransmon\ntrapped ion\nion trap\nphotonic qubit\nneutral atom\nspin qubit\nquantum dot"
+                    elif key == "hardware_control_systems":
+                        example_keywords = "dilution refrigerator\ncryostat\nmicrowave control\nqubit readout\nparametric amplifier"
+                    elif key == "middleware_hybrid_system_software":
+                        example_keywords = "quantum cloud\nhybrid quantum classical\nquantum scheduler\nerror mitigation"
+                    elif key == "middleware_software_development_kits":
+                        example_keywords = "qiskit\ncirq\nq#\npennylane\nquantum simulator"
+                    elif key == "middleware_compilers":
+                        example_keywords = "quantum compiler\nqubit mapping\ncircuit optimization\ngate synthesis"
+                    elif key == "middleware_quantum_error_correction":
+                        example_keywords = "surface code\nerror correction\nlogical qubit\nfault tolerant"
+                    elif key == "software_algorithms":
+                        example_keywords = "grover algorithm\nshor algorithm\nqaoa\nvqe\nquantum fourier transform"
+                    elif key == "software_applications":
+                        example_keywords = "quantum chemistry\ndrug discovery\nportfolio optimization\nquantum machine learning"
+                
                 keywords_text = st.text_area(
                     "Enter keywords/phrases (one per line)",
                     key=f"kw_{key}",
-                    height=120
+                    value=example_keywords,
+                    height=120,
+                    help="Keywords help the ML model understand what to look for in patents"
                 )
                 keywords = [k.strip() for k in keywords_text.split('\n') if k.strip()]
                 keyword_mappings[key] = keywords
