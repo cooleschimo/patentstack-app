@@ -655,7 +655,7 @@ class GooglePatentPuller:
     global_settings: dict[str, Any]
     patents_dataset: str
 
-    def __init__(self, cpc_parser: CPCParser, project_id: str | None = None) -> None:
+    def __init__(self, cpc_parser: CPCParser, project_id: str | None = None, credentials: Any = None) -> None:
         self.project_id = project_id if project_id else os.getenv('BIGQUERY_PROJECT_ID')
         if not self.project_id:
             raise ValueError(
@@ -663,9 +663,29 @@ class GooglePatentPuller:
                 "Please provide project_id parameter or set BIGQUERY_PROJECT_ID environment variable."
             )
         self.cpc_parser = cpc_parser
-        self.client = bigquery.Client(project=self.project_id)
+        self.credentials = credentials
+        self.client = None
         self.global_settings = cpc_parser.global_settings
         self.patents_dataset = "patents-public-data.patents.publications"
+    
+    def _get_client(self) -> bigquery.Client:
+        """Lazy initialization of BigQuery client."""
+        if self.client is None:
+            try:
+                if self.credentials:
+                    # Use provided credentials
+                    self.client = bigquery.Client(project=self.project_id, credentials=self.credentials)
+                else:
+                    # Try to use application default credentials
+                    self.client = bigquery.Client(project=self.project_id)
+            except Exception as e:
+                logger.error(f"Failed to initialize BigQuery client: {e}")
+                raise ValueError(
+                    f"Failed to initialize BigQuery client. \n"
+                    f"Please authenticate with Google Cloud or provide credentials.\n"
+                    f"Error: {e}"
+                )
+        return self.client
 
     def _build_intl_query(self, companies: list[str],
                       domains: list[str],
@@ -761,7 +781,7 @@ class GooglePatentPuller:
         job_config: bigquery.QueryJobConfig = bigquery.QueryJobConfig(dry_run=True, use_query_cache=False)
 
         try:
-            job: bigquery.QueryJob = self.client.query(query, job_config=job_config)
+            job: bigquery.QueryJob = self._get_client().query(query, job_config=job_config)
             bytes_processed: int = job.total_bytes_processed
             gb_processed: float = bytes_processed / (1024**3)
             tb_processed: float = bytes_processed / (1024**4)
@@ -785,7 +805,7 @@ class GooglePatentPuller:
             logger.info("Executing BigQuery for international patents...")
             start_time: float = time.time()
             
-            job = self.client.query(query)
+            job = self._get_client().query(query)
             results = job.result()
             df: pd.DataFrame = results.to_dataframe()
             
@@ -903,7 +923,7 @@ class HybridPatentPuller:
     Orchestrates both US and international patent data extraction.
     """
     def __init__(self, cpc_parser: CPCParser, uspto_api_key: str | None = None, 
-                 google_project_id: str | None = None) -> None:
+                 google_project_id: str | None = None, google_credentials: Any = None) -> None:
         self.cpc_parser = cpc_parser
         
         # USPTO puller 
@@ -913,7 +933,7 @@ class HybridPatentPuller:
         # BigQuery puller
         if google_project_id:
             try:
-                self.bigquery_puller = GooglePatentPuller(cpc_parser, project_id=google_project_id)
+                self.bigquery_puller = GooglePatentPuller(cpc_parser, project_id=google_project_id, credentials=google_credentials)
                 logger.info("BigQuery initialized for international patents")
             except Exception as e:
                 logger.error(f"BigQuery initialization failed: {e}")

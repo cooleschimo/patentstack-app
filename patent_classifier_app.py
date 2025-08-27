@@ -49,7 +49,8 @@ if 'cpc_config' not in st.session_state:
 if 'api_keys' not in st.session_state:
     st.session_state.api_keys = {
         'uspto_key': '',
-        'google_project_id': ''
+        'google_project_id': '',
+        'google_credentials': None
     }
 
 if 'fetched_data' not in st.session_state:
@@ -125,13 +126,55 @@ def create_api_configuration():
         st.session_state.api_keys['uspto_key'] = uspto_key
     
     with col2:
+        st.markdown("### Google Cloud Setup")
         google_project = st.text_input(
             "Google Cloud Project ID (Optional)",
             value=st.session_state.api_keys['google_project_id'],
             placeholder="my-project-id",
-            help="Required for Google Patents BigQuery. Set up at https://console.cloud.google.com"
+            help="Required for Google Patents BigQuery"
         )
         st.session_state.api_keys['google_project_id'] = google_project
+        
+        if google_project:
+            # Google authentication options
+            auth_method = st.radio(
+                "Google Authentication Method",
+                ["Use Service Account JSON", "Use Application Default Credentials"],
+                help="Choose how to authenticate with Google Cloud"
+            )
+            
+            if auth_method == "Use Service Account JSON":
+                uploaded_file = st.file_uploader(
+                    "Upload Service Account JSON",
+                    type=['json'],
+                    help="Upload your Google Cloud service account credentials JSON file"
+                )
+                if uploaded_file:
+                    try:
+                        # Import Google auth libraries
+                        try:
+                            from google.oauth2 import service_account
+                        except ImportError:
+                            st.error("Google Cloud libraries not installed. Run: pip install google-cloud-bigquery")
+                            st.session_state.api_keys['google_credentials'] = None
+                            return False
+                        
+                        # Read and parse the JSON file
+                        credentials_dict = json.loads(uploaded_file.read())
+                        
+                        # Create credentials object
+                        credentials = service_account.Credentials.from_service_account_info(
+                            credentials_dict,
+                            scopes=["https://www.googleapis.com/auth/cloud-platform"]
+                        )
+                        st.session_state.api_keys['google_credentials'] = credentials
+                        st.success("✅ Google credentials loaded successfully!")
+                    except Exception as e:
+                        st.error(f"Error loading credentials: {e}")
+                        st.session_state.api_keys['google_credentials'] = None
+            else:
+                st.info("ℹ️ Using Application Default Credentials. Make sure you have run 'gcloud auth application-default login' on your machine.")
+                st.session_state.api_keys['google_credentials'] = None
     
     if not uspto_key and not google_project:
         st.warning("⚠️ At least one API configuration is required to fetch patents")
@@ -334,7 +377,8 @@ def fetch_patent_data():
             puller = HybridPatentPuller(
                 cpc_parser,
                 uspto_api_key=st.session_state.api_keys['uspto_key'] if st.session_state.api_keys['uspto_key'] else None,
-                google_project_id=st.session_state.api_keys['google_project_id'] if st.session_state.api_keys['google_project_id'] else None
+                google_project_id=st.session_state.api_keys['google_project_id'] if st.session_state.api_keys['google_project_id'] else None,
+                google_credentials=st.session_state.api_keys.get('google_credentials')
             )
             
             # Get parameters
@@ -501,6 +545,80 @@ def clean_and_deduplicate_data():
         
         st.info(f"Found {len(unique_assignees)} unique assignees in the data")
         st.info("📝 Company name matching ignores punctuation and common suffixes (Inc, LLC, Corp, etc.)")
+        
+        # Company consolidation feature
+        st.markdown("#### 🔄 Company Name Consolidation")
+        with st.expander("Combine company variations into single names", expanded=False):
+            st.write("Map different company name variations to a single company name.")
+            st.info("💡 Tip: This helps combine variations like 'Microsoft', 'Microsoft Licensing', 'Microsoft Co.' into a single 'Microsoft' entry")
+            
+            # Initialize consolidation mapping in session state if not exists
+            if 'company_mapping' not in st.session_state:
+                st.session_state.company_mapping = {}
+            
+            # Quick auto-detect button
+            if st.button("🔍 Auto-detect Company Variations"):
+                for target_company in configured_companies:
+                    normalized_target = normalize_company_name(target_company)
+                    auto_matches = []
+                    for assignee in unique_assignees:
+                        normalized_assignee = normalize_company_name(assignee)
+                        # More aggressive matching for auto-detect
+                        if (normalized_target in normalized_assignee and 
+                            assignee != target_company):
+                            auto_matches.append(assignee)
+                    if auto_matches:
+                        st.session_state.company_mapping[target_company] = auto_matches
+                st.success("✅ Auto-detected potential variations. Review and adjust below.")
+                st.rerun()
+            
+            # For each configured company, find potential matches
+            for target_company in configured_companies:
+                st.markdown(f"**{target_company}**")
+                normalized_target = normalize_company_name(target_company)
+                
+                # Find all assignees that might be variations of this company
+                potential_matches = []
+                for assignee in unique_assignees:
+                    normalized_assignee = normalize_company_name(assignee)
+                    # Check if the normalized assignee contains the target company name
+                    if (normalized_target in normalized_assignee or 
+                        normalized_assignee in normalized_target or
+                        # Also check if they share significant parts
+                        (len(normalized_target) > 3 and 
+                         len(normalized_assignee) > 3 and
+                         normalized_target[:4] == normalized_assignee[:4])):
+                        if assignee != target_company:
+                            potential_matches.append(assignee)
+                
+                if potential_matches:
+                    # Show potential matches with checkboxes
+                    selected_matches = st.multiselect(
+                        f"Select variations to combine into '{target_company}':",
+                        options=potential_matches,
+                        default=st.session_state.company_mapping.get(target_company, []),
+                        key=f"combine_{target_company}"
+                    )
+                    st.session_state.company_mapping[target_company] = selected_matches
+                else:
+                    st.write(f"No variations found for {target_company}")
+            
+            # Apply the mapping to the dataframe
+            if st.session_state.company_mapping:
+                st.markdown("---")
+                if st.button("Apply Company Consolidation", type="primary"):
+                    # Create a mapping dictionary
+                    assignee_map = {}
+                    for target, variations in st.session_state.company_mapping.items():
+                        for variation in variations:
+                            assignee_map[variation] = target
+                    
+                    # Apply the mapping
+                    df['assignee'] = df['assignee'].replace(assignee_map)
+                    # Update the session state data
+                    st.session_state.fetched_data['assignee'] = df['assignee']
+                    st.success(f"✅ Consolidated {len(assignee_map)} company variations!")
+                    st.rerun()
         
         filter_assignees = st.checkbox(
             "Filter to only configured companies", 
@@ -727,19 +845,48 @@ def create_classification_ui():
         help="Higher values = stricter matching (fewer but more accurate classifications). Lower values = more inclusive (more classifications but potentially less accurate). 50% is recommended for best precision."
     )
     
+    # Cache the model loading function
+    @st.cache_resource
+    def load_ml_model():
+        """Load and cache the BERT model for patent classification"""
+        from transformers import AutoTokenizer, AutoModel
+        
+        # Try models in order of preference
+        models_to_try = [
+            ("anferico/bert-for-patents", "patent-specific (Google BERT for Patents)"),
+            ("prithivida/bert-for-patents-64d", "patent-specific (64d embeddings)"),
+            ("AI-Growth-Lab/PatentSBERTa", "patent-specific (PatentSBERTa)"),
+            ("allenai/scibert_scivocab_uncased", "scientific text"),
+            ("bert-base-uncased", "general fallback")
+        ]
+        
+        for model_name, model_type in models_to_try:
+            try:
+                tokenizer = AutoTokenizer.from_pretrained(model_name)
+                model = AutoModel.from_pretrained(model_name)
+                model.eval()
+                return tokenizer, model, model_name, model_type
+            except Exception as e:
+                continue
+        
+        raise Exception("Could not load any BERT model. Please check your internet connection.")
+    
     # Apply classification using ML
     if st.button("🎯 Apply ML Classification", type="primary"):
         with st.spinner("Loading ML model... This may take a moment on first run."):
             try:
-                from transformers import AutoTokenizer, AutoModel
                 import torch
                 from sklearn.metrics.pairwise import cosine_similarity
                 
-                # Load model
-                model_name = "google/bert_for_patents"
-                tokenizer = AutoTokenizer.from_pretrained(model_name)
-                model = AutoModel.from_pretrained(model_name)
-                model.eval()
+                # Load cached model
+                tokenizer, model, model_name, model_type = load_ml_model()
+                
+                if "patent-specific" in model_type:
+                    st.success(f"✅ Loaded {model_type}: {model_name}")
+                elif "scientific" in model_type:
+                    st.info(f"ℹ️ Using scientific text model: {model_name}")
+                else:
+                    st.warning(f"⚠️ Using general model: {model_name}. Results may be less accurate for patent classification.")
                 
                 def get_embedding(text, max_length=512):
                     inputs = tokenizer(text, return_tensors="pt", max_length=max_length, 
