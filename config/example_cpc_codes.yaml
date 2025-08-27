@@ -3,84 +3,41 @@
 
 domains:
   quantum_computing:
-    description: "Quantum information processing and computing technologies"
+    description: "Information processing based on quantum-mechanical phenomena"
     cpc_codes:
-      # Class-level codes (broader coverage)
-      - code: "G06N10"
-        description: "Quantum computing - all quantum algorithms and processing"
-      - code: "H04L9"
-        description: "Cryptographic mechanisms including quantum"
-      - code: "H01L39"
-        description: "Superconducting devices"
-      - code: "G01R33"
-        description: "Magnetic resonance and quantum sensing"
-      # Subgroup-level codes (specific technologies)
+      # Primary quantum computing codes
       - code: "G06N10/20"
-        description: "Quantum algorithms for solving problems"
+        description: "Models of quantum computing, e.g. quantum circuits or universal quantum computers"
       - code: "G06N10/40"
-        description: "Physical realization of quantum computers"
+        description: "Physical realisations or architectures of quantum processors or components for manipulating qubits"
       - code: "G06N10/60"
-        description: "Quantum error correction"
+        description: "Quantum algorithms, e.g. based on quantum optimisation, quantum Fourier or Hadamard transforms"
+      - code: "G06N10/70"
+        description: "Quantum error correction, detection or prevention, e.g. surface codes or magic state distillation"
+      - code: "G06N10/80"
+        description: "Quantum programming, e.g. interfaces, languages or software-development kits"
+      
+      # Additional relevant codes
+      - code: "G06N10"
+        description: "Quantum computing (general)"
       - code: "H04L9/0852"
         description: "Quantum key distribution"
+      - code: "H04B10/70"
+        description: "Quantum communication"
       - code: "H01L39/24"
-        description: "Josephson junction devices for quantum"
-  
-  artificial_intelligence:
-    description: "Machine learning and AI technologies"
-    cpc_codes:
-      # Class-level codes
-      - code: "G06N3"
-        description: "Neural networks and computing systems"
-      - code: "G06N20"
-        description: "Machine learning"
-      - code: "G06F40"
-        description: "Natural language processing"
-      - code: "G06V10"
-        description: "Computer vision and pattern recognition"
-      # Subgroup-level codes
-      - code: "G06N3/04"
-        description: "Architecture of neural networks"
-      - code: "G06N3/08"
-        description: "Learning methods for neural networks"
-      - code: "G06N20/10"
-        description: "Kernel methods and support vector machines"
-      - code: "G06F40/30"
-        description: "Semantic analysis in NLP"
-      - code: "G06V10/82"
-        description: "Neural networks for image recognition"
-  
-  biotechnology:
-    description: "Biological and medical technologies"
-    cpc_codes:
-      # Class-level codes
-      - code: "C12N"
-        description: "Microorganisms and genetic engineering"
-      - code: "C12Q"
-        description: "Measuring or testing with biological methods"
-      - code: "A61K"
-        description: "Medical preparations"
-      - code: "G16B"
-        description: "Bioinformatics"
-      # Subgroup-level codes
-      - code: "C12N15/09"
-        description: "Recombinant DNA technology"
-      - code: "C12N15/11"
-        description: "DNA or RNA fragments"
-      - code: "C12Q1/68"
-        description: "Nucleic acid testing"
-      - code: "A61K38/00"
-        description: "Medicinal peptides"
-      - code: "G16B20/00"
-        description: "Functional genomics or proteomics"
+        description: "Josephson junction devices"
+      - code: "H01L39/22"
+        description: "Superconducting devices with potential barriers"
+      - code: "G01R33/035"
+        description: "NMR quantum computing arrangements"
+      - code: "B82Y10"
+        description: "Nanotechnology for quantum computing"
 
 user_inputs:
   companies:
+    - International Business Machines
     - IBM
     - Google
-    - Microsoft
-    - Apple
-    - Amazon
   date_range:
     start_year: 2020
     end_year: 2024

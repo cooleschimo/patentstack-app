@@ -1,0 +1,508 @@
+# Quantum Computing Technology Stack Classification Keywords
+# Three-tier hierarchy: Hardware, Middleware, Software
+
+tech_stacks:
+  hardware:
+    description: "Physical quantum computing components and systems"
+    subcategories:
+      quantum_processing_unit:
+        keywords:
+          # Superconducting qubits
+          - "superconducting qubit"
+          - "transmon"
+          - "xmon"
+          - "fluxonium"
+          - "charge qubit"
+          - "flux qubit"
+          - "phase qubit"
+          - "josephson junction"
+          - "squid"
+          - "superconducting quantum interference device"
+          - "cooper pair box"
+          - "quantronium"
+          - "asymmetric transmon"
+          - "c-shunt flux qubit"
+          - "3d transmon"
+          - "coplanar waveguide resonator"
+          
+          # Trapped ion systems
+          - "trapped ion"
+          - "ion trap"
+          - "paul trap"
+          - "penning trap"
+          - "linear ion trap"
+          - "surface electrode trap"
+          - "microfabricated ion trap"
+          - "segmented ion trap"
+          - "calcium ion"
+          - "ytterbium ion"
+          - "beryllium ion"
+          - "barium ion"
+          
+          # Photonic quantum computing
+          - "photonic qubit"
+          - "linear optical quantum"
+          - "integrated photonics"
+          - "silicon photonics"
+          - "waveguide"
+          - "beam splitter"
+          - "phase shifter"
+          - "single photon source"
+          - "single photon detector"
+          - "boson sampling"
+          - "gaussian boson sampling"
+          - "photonic chip"
+          
+          # Neutral atom systems
+          - "neutral atom"
+          - "optical lattice"
+          - "optical tweezer"
+          - "rydberg atom"
+          - "cold atom"
+          - "ultracold atom"
+          - "atomic array"
+          - "dipole trap"
+          - "magneto-optical trap"
+          
+          # Spin-based systems
+          - "spin qubit"
+          - "quantum dot"
+          - "silicon quantum dot"
+          - "germanium quantum dot"
+          - "gaas quantum dot"
+          - "nitrogen vacancy center"
+          - "nv center"
+          - "silicon carbide defect"
+          - "phosphorus donor"
+          - "nuclear spin"
+          - "electron spin"
+          
+          # Topological qubits
+          - "topological qubit"
+          - "majorana fermion"
+          - "majorana zero mode"
+          - "anyonic qubit"
+          - "topological superconductor"
+          - "nanowire"
+          
+      control_systems:
+        keywords:
+          # Cryogenic systems
+          - "dilution refrigerator"
+          - "cryostat"
+          - "millikelvin"
+          - "cryogenic"
+          - "pulse tube cooler"
+          - "adiabatic demagnetization"
+          - "helium-3"
+          - "helium-4"
+          - "thermal management"
+          - "heat exchanger"
+          - "cold plate"
+          - "thermal shield"
+          
+          # Control electronics
+          - "arbitrary waveform generator"
+          - "awg"
+          - "microwave control"
+          - "rf control"
+          - "qubit control electronics"
+          - "fpga control"
+          - "asic control"
+          - "dac"
+          - "adc"
+          - "mixer"
+          - "local oscillator"
+          - "iq modulation"
+          - "pulse shaping"
+          - "control pulse"
+          
+          # Readout systems
+          - "qubit readout"
+          - "dispersive readout"
+          - "quantum non-demolition"
+          - "qnd measurement"
+          - "homodyne detection"
+          - "heterodyne detection"
+          - "parametric amplifier"
+          - "twpa"
+          - "traveling wave parametric amplifier"
+          - "josephson parametric amplifier"
+          - "jpa"
+          - "quantum limited amplifier"
+          
+          # Laser systems
+          - "laser control"
+          - "raman laser"
+          - "cooling laser"
+          - "repump laser"
+          - "addressing laser"
+          - "aom"
+          - "acousto-optic modulator"
+          - "eom"
+          - "electro-optic modulator"
+          - "laser stabilization"
+          - "frequency comb"
+          
+      ancillary_components:
+        keywords:
+          # Packaging and interconnects
+          - "quantum package"
+          - "qubit packaging"
+          - "wirebond"
+          - "flip chip"
+          - "tsv"
+          - "through silicon via"
+          - "superconducting wire"
+          - "coaxial cable"
+          - "attenuator"
+          - "circulator"
+          - "isolator"
+          - "directional coupler"
+          
+          # Shielding and filtering
+          - "magnetic shielding"
+          - "mu-metal"
+          - "faraday cage"
+          - "electromagnetic shielding"
+          - "infrared filter"
+          - "low pass filter"
+          - "band pass filter"
+          - "eccosorb"
+          - "radiation shield"
+          
+          # Calibration and characterization
+          - "qubit calibration"
+          - "gate calibration"
+          - "crosstalk characterization"
+          - "process tomography"
+          - "state tomography"
+          - "randomized benchmarking"
+          - "gate set tomography"
+          - "spectroscopy"
+          - "rabi oscillation"
+          - "ramsey fringe"
+          
+  middleware:
+    description: "System software and tools for quantum computing"
+    subcategories:
+      hybrid_system_software:
+        keywords:
+          # Cloud and distributed systems
+          - "quantum cloud"
+          - "quantum as a service"
+          - "qaas"
+          - "cloud quantum computing"
+          - "distributed quantum computing"
+          - "quantum network"
+          - "quantum internet"
+          - "quantum repeater"
+          - "quantum router"
+          - "quantum switch"
+          
+          # Hybrid quantum-classical
+          - "hybrid quantum classical"
+          - "variational quantum classical"
+          - "quantum classical interface"
+          - "classical optimizer"
+          - "parameter server"
+          - "gradient estimation"
+          - "parameter shift rule"
+          - "finite difference"
+          - "spsa"
+          - "simultaneous perturbation"
+          
+          # Resource management
+          - "quantum resource management"
+          - "qubit allocation"
+          - "quantum scheduler"
+          - "job queue"
+          - "batch processing"
+          - "quantum workload"
+          - "resource estimation"
+          - "quantum volume"
+          - "circuit depth"
+          - "gate count"
+          - "qubit connectivity"
+          
+          # Runtime optimization
+          - "runtime optimization"
+          - "dynamic circuit"
+          - "adaptive circuit"
+          - "circuit cutting"
+          - "circuit knitting"
+          - "virtual quantum"
+          - "quantum virtualization"
+          - "noise mitigation"
+          - "error mitigation"
+          - "zero noise extrapolation"
+          - "probabilistic error cancellation"
+          
+      software_development_kits:
+        keywords:
+          # Quantum SDKs and frameworks
+          - "qiskit"
+          - "cirq"
+          - "q#"
+          - "qsharp"
+          - "forest"
+          - "pyquil"
+          - "projectq"
+          - "pennylane"
+          - "strawberry fields"
+          - "ocean sdk"
+          - "braket sdk"
+          - "quantum development kit"
+          - "qdk"
+          
+          # Programming languages and DSLs
+          - "openqasm"
+          - "qasm"
+          - "quil"
+          - "quantum instruction"
+          - "quantum assembly"
+          - "blackbird"
+          - "qcl"
+          - "quantum computation language"
+          - "scaffold"
+          - "silq"
+          
+          # Development tools
+          - "quantum simulator"
+          - "circuit simulator"
+          - "state vector simulator"
+          - "density matrix simulator"
+          - "tensor network simulator"
+          - "quantum debugger"
+          - "quantum profiler"
+          - "quantum visualizer"
+          - "bloch sphere"
+          - "circuit diagram"
+          
+      compilers:
+        keywords:
+          # Compilation and transpilation
+          - "quantum compiler"
+          - "quantum transpiler"
+          - "circuit optimization"
+          - "gate synthesis"
+          - "gate decomposition"
+          - "unitary synthesis"
+          - "clifford optimization"
+          - "peephole optimization"
+          - "commutation analysis"
+          - "gate cancellation"
+          - "gate fusion"
+          
+          # Mapping and routing
+          - "qubit mapping"
+          - "qubit routing"
+          - "swap insertion"
+          - "swap network"
+          - "steiner tree"
+          - "coupling map"
+          - "connectivity constraint"
+          - "layout synthesis"
+          - "initial mapping"
+          
+          # Circuit optimization
+          - "circuit rewriting"
+          - "template matching"
+          - "zx calculus"
+          - "zx diagram"
+          - "phase polynomial"
+          - "t gate optimization"
+          - "hadamard reduction"
+          - "cnot optimization"
+          - "two qubit gate"
+          
+      quantum_error_correction:
+        keywords:
+          # Error correction codes
+          - "surface code"
+          - "toric code"
+          - "planar code"
+          - "color code"
+          - "bacon-shor code"
+          - "steane code"
+          - "shor code"
+          - "repetition code"
+          - "stabilizer code"
+          - "css code"
+          - "calderbank shor steane"
+          - "bosonic code"
+          - "cat code"
+          - "gkp code"
+          - "gottesman kitaev preskill"
+          
+          # Fault tolerance
+          - "fault tolerant"
+          - "logical qubit"
+          - "physical qubit"
+          - "code distance"
+          - "threshold theorem"
+          - "magic state"
+          - "magic state distillation"
+          - "state injection"
+          - "lattice surgery"
+          - "code deformation"
+          - "transversal gate"
+          
+          # Decoders and syndrome processing
+          - "syndrome extraction"
+          - "syndrome measurement"
+          - "decoder"
+          - "minimum weight perfect matching"
+          - "mwpm"
+          - "union find"
+          - "belief propagation"
+          - "tensor network decoder"
+          - "neural network decoder"
+          - "machine learning decoder"
+          
+  software:
+    description: "Quantum algorithms and applications"
+    subcategories:
+      algorithms:
+        keywords:
+          # Foundational algorithms
+          - "grover algorithm"
+          - "shor algorithm"
+          - "deutsch josza"
+          - "simon algorithm"
+          - "bernstein vazirani"
+          - "quantum fourier transform"
+          - "qft"
+          - "phase estimation"
+          - "amplitude estimation"
+          - "amplitude amplification"
+          - "quantum counting"
+          
+          # Optimization algorithms
+          - "qaoa"
+          - "quantum approximate optimization"
+          - "vqe"
+          - "variational quantum eigensolver"
+          - "quantum annealing"
+          - "adiabatic quantum computation"
+          - "quantum walk"
+          - "grover adaptive search"
+          - "quantum gradient descent"
+          - "quantum natural gradient"
+          
+          # Simulation algorithms
+          - "hamiltonian simulation"
+          - "trotter suzuki"
+          - "lie trotter"
+          - "linear combination of unitaries"
+          - "lcu"
+          - "qubitization"
+          - "quantum signal processing"
+          - "qsp"
+          - "quantum singular value transformation"
+          - "qsvt"
+          - "block encoding"
+          
+          # Machine learning algorithms
+          - "quantum machine learning"
+          - "quantum neural network"
+          - "qnn"
+          - "quantum kernel"
+          - "quantum support vector machine"
+          - "qsvm"
+          - "quantum boltzmann machine"
+          - "quantum gan"
+          - "quantum autoencoder"
+          - "quantum pca"
+          - "hhl algorithm"
+          - "quantum linear solver"
+          
+          # Cryptographic algorithms
+          - "quantum key distribution"
+          - "qkd"
+          - "bb84"
+          - "e91"
+          - "quantum digital signature"
+          - "quantum secret sharing"
+          - "quantum random number"
+          - "qrng"
+          
+      applications:
+        keywords:
+          # Chemistry and materials
+          - "quantum chemistry"
+          - "molecular simulation"
+          - "electronic structure"
+          - "ground state energy"
+          - "excited state"
+          - "molecular dynamics"
+          - "fermionic simulation"
+          - "jordan wigner"
+          - "bravyi kitaev"
+          - "parity mapping"
+          - "molecular orbital"
+          - "hartree fock"
+          - "coupled cluster"
+          - "configuration interaction"
+          - "density functional theory"
+          - "active space"
+          
+          # Drug discovery and biology
+          - "drug discovery"
+          - "protein folding"
+          - "molecular docking"
+          - "drug target"
+          - "lead optimization"
+          - "pharmacophore"
+          - "qsar"
+          - "enzyme catalysis"
+          - "protein protein interaction"
+          - "metabolic pathway"
+          - "systems biology"
+          
+          # Finance
+          - "portfolio optimization"
+          - "option pricing"
+          - "risk analysis"
+          - "monte carlo"
+          - "derivative pricing"
+          - "credit risk"
+          - "fraud detection"
+          - "high frequency trading"
+          - "asset allocation"
+          - "yield curve"
+          
+          # Optimization and logistics
+          - "traveling salesman"
+          - "vehicle routing"
+          - "supply chain"
+          - "scheduling optimization"
+          - "resource allocation"
+          - "network optimization"
+          - "traffic flow"
+          - "energy grid"
+          - "smart grid"
+          
+          # Machine learning applications
+          - "pattern recognition"
+          - "anomaly detection"
+          - "recommendation system"
+          - "natural language processing"
+          - "computer vision"
+          - "time series"
+          - "reinforcement learning"
+          - "generative model"
+          - "feature extraction"
+          - "dimensionality reduction"
+          
+          # Cryptography and security
+          - "post quantum cryptography"
+          - "lattice cryptography"
+          - "code based cryptography"
+          - "hash based signature"
+          - "multivariate cryptography"
+          - "isogeny cryptography"
+          - "quantum resistant"
+          - "quantum safe"
+          - "cryptanalysis"
+          - "random number generation"
