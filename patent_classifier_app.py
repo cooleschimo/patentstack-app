@@ -240,14 +240,31 @@ def create_api_configuration():
                     st.markdown("""
                     ### Quick Setup Guide:
                     
+                    ⚠️ **IMPORTANT: Enable Billing to Avoid Free Tier Limits**
+                    
+                    If you see "Quota exceeded" errors, your project is using the free sandbox mode.
+                    To use your credits:
+                    1. Go to **Billing** → **Link a billing account** 
+                    2. Select your billing account with credits
+                    3. Link it to your project
+                    
+                    ### Step-by-Step Setup:
+                    
                     1. **Go to Google Cloud Console**: https://console.cloud.google.com
                     
                     2. **Create or select a project**:
                        - Click the project dropdown at the top
                        - Click "New Project" if needed
                        - Name it (e.g., "patent-analysis")
+                       - **IMPORTANT**: Link a billing account during creation or after
                     
-                    3. **Enable BigQuery API**:
+                    3. **Enable Billing** (Required to use credits):
+                       - Go to **Billing** in the navigation menu
+                       - Click **Link a billing account**
+                       - Select your billing account (with credits)
+                       - Confirm linking
+                    
+                    4. **Enable BigQuery API**:
                        - Go to **APIs & Services** → **Enable APIs and Services**
                        - Search for **"BigQuery API"**
                        - Click on it and press **Enable**
@@ -685,6 +702,8 @@ def clean_and_deduplicate_data():
             
             # Quick auto-detect button
             if st.button("🔍 Auto-detect Company Variations"):
+                # Clear existing mappings before auto-detecting
+                st.session_state.company_mapping = {}
                 for target_company in configured_companies:
                     normalized_target = normalize_company_name(target_company)
                     auto_matches = []
@@ -696,7 +715,10 @@ def clean_and_deduplicate_data():
                             auto_matches.append(assignee)
                     if auto_matches:
                         st.session_state.company_mapping[target_company] = auto_matches
-                st.success("✅ Auto-detected potential variations. Review and adjust below.")
+                if st.session_state.company_mapping:
+                    st.success("✅ Auto-detected potential variations. Review and adjust below.")
+                else:
+                    st.info("No variations detected. Company names may already be consolidated.")
                 st.rerun()
             
             # For each configured company, find potential matches
@@ -720,10 +742,14 @@ def clean_and_deduplicate_data():
                 
                 if potential_matches:
                     # Show potential matches with checkboxes
+                    # Filter default values to only include those that still exist in potential_matches
+                    current_defaults = st.session_state.company_mapping.get(target_company, [])
+                    valid_defaults = [d for d in current_defaults if d in potential_matches]
+                    
                     selected_matches = st.multiselect(
                         f"Select variations to combine into '{target_company}':",
                         options=potential_matches,
-                        default=st.session_state.company_mapping.get(target_company, []),
+                        default=valid_defaults,
                         key=f"combine_{target_company}"
                     )
                     st.session_state.company_mapping[target_company] = selected_matches
@@ -744,6 +770,8 @@ def clean_and_deduplicate_data():
                     df['assignee'] = df['assignee'].replace(assignee_map)
                     # Update the session state data
                     st.session_state.fetched_data['assignee'] = df['assignee']
+                    # Clear the company mapping after applying to prevent stale data
+                    st.session_state.company_mapping = {}
                     st.success(f"✅ Consolidated {len(assignee_map)} company variations!")
                     st.rerun()
         
@@ -965,11 +993,11 @@ def create_classification_ui():
     st.markdown("### Classification Settings")
     ml_threshold = st.slider(
         "ML Similarity Threshold",
-        min_value=0.3,
-        max_value=0.7,
-        value=0.5,
+        min_value=0.1,
+        max_value=0.5,
+        value=0.25,
         step=0.05,
-        help="Higher values = stricter matching (fewer but more accurate classifications). Lower values = more inclusive (more classifications but potentially less accurate). 50% is recommended for best precision."
+        help="BERT similarities are typically lower than expected. 0.25-0.35 works best for patent classification. Lower = more inclusive, Higher = stricter."
     )
     
     # Cache the model loading function
@@ -1024,12 +1052,20 @@ def create_classification_ui():
                 
                 st.success("✅ Model loaded successfully!")
                 
-                # Pre-compute keyword embeddings
+                # Pre-compute keyword embeddings - use multiple embeddings per category
+                st.info("Computing keyword embeddings for each category...")
                 keyword_embeddings = {}
                 for key, keywords in keyword_mappings.items():
                     if keywords:
-                        keyword_text = " ".join(keywords)
-                        keyword_embeddings[key] = get_embedding(keyword_text)
+                        # Method 1: Individual keyword embeddings (better for diverse concepts)
+                        embeddings = []
+                        for keyword in keywords[:10]:  # Limit to top 10 keywords to avoid memory issues
+                            embeddings.append(get_embedding(keyword))
+                        keyword_embeddings[key] = embeddings
+                        
+                        # Method 2: Combined text (alternative - commented out)
+                        # keyword_text = " ".join(keywords)
+                        # keyword_embeddings[key] = [get_embedding(keyword_text)]
                 
                 # Classify patents
                 classified_df = df.copy()
@@ -1039,6 +1075,10 @@ def create_classification_ui():
                 
                 progress_bar = st.progress(0)
                 total_patents = len(classified_df)
+                
+                # Debug info
+                classifications_made = 0
+                similarity_scores = []
                 
                 for idx, row in classified_df.iterrows():
                     if idx % 10 == 0:
@@ -1052,11 +1092,15 @@ def create_classification_ui():
                         best_match = None
                         best_score = ml_threshold  # Use user-selected threshold
                         
-                        for key, keyword_emb in keyword_embeddings.items():
-                            similarity = cosine_similarity(patent_embedding, keyword_emb)[0][0]
+                        for key, keyword_embs in keyword_embeddings.items():
+                            # Calculate max similarity across all keyword embeddings for this category
+                            max_similarity = 0
+                            for keyword_emb in keyword_embs:
+                                similarity = cosine_similarity(patent_embedding, keyword_emb)[0][0]
+                                max_similarity = max(max_similarity, similarity)
                             
-                            if similarity > best_score:
-                                best_score = similarity
+                            if max_similarity > best_score:
+                                best_score = max_similarity
                                 best_match = key
                         
                         if best_match:
@@ -1064,9 +1108,25 @@ def create_classification_ui():
                             if len(parts) >= 2:
                                 classified_df.at[idx, 'tech_stack'] = parts[0]
                                 classified_df.at[idx, 'subcategory'] = '_'.join(parts[1:])
-                                classified_df.at[idx, 'confidence'] = float(best_score)
+                            else:
+                                classified_df.at[idx, 'tech_stack'] = best_match
+                                classified_df.at[idx, 'subcategory'] = ''
+                            classified_df.at[idx, 'confidence'] = float(best_score)
+                            classifications_made += 1
+                        
+                        # Debug: Show scores for first few patents
+                        if idx < 3:
+                            similarity_scores.append(f"Patent {idx}: best_score={best_score:.3f}, match={best_match}")
                 
                 progress_bar.progress(1.0)
+                
+                # Show debug information
+                if similarity_scores:
+                    with st.expander("🔍 Debug: Similarity Scores"):
+                        for score_info in similarity_scores[:5]:
+                            st.write(score_info)
+                        st.info(f"Total classified: {classifications_made}/{total_patents}")
+                        st.info(f"Threshold used: {ml_threshold}")
                 
             except ImportError:
                 st.error("Please install required packages: pip install transformers torch scikit-learn")
