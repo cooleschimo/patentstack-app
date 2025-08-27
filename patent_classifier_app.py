@@ -166,74 +166,74 @@ def create_api_configuration():
             
                 if auth_method == "Paste Service Account JSON":
                     st.info("📋 Paste your service account JSON content below")
-                json_input = st.text_area(
-                    "Service Account JSON",
-                    height=200,
-                    placeholder='{\n  "type": "service_account",\n  "project_id": "your-project",\n  ...\n}',
-                    help="Paste the entire contents of your service account JSON file"
-                )
-                
+                    json_input = st.text_area(
+                        "Service Account JSON",
+                        height=200,
+                        placeholder='{\n  "type": "service_account",\n  "project_id": "your-project",\n  ...\n}',
+                        help="Paste the entire contents of your service account JSON file"
+                    )
+                    
                     if json_input:
-                    try:
-                        # Import Google auth libraries
                         try:
-                            from google.oauth2 import service_account
-                        except ImportError:
-                            st.error("Google Cloud libraries not installed. Run: pip install google-cloud-bigquery")
+                            # Import Google auth libraries
+                            try:
+                                from google.oauth2 import service_account
+                            except ImportError:
+                                st.error("Google Cloud libraries not installed. Run: pip install google-cloud-bigquery")
+                                st.session_state.api_keys['google_credentials'] = None
+                                return False
+                            
+                            # Parse the JSON
+                            credentials_dict = json.loads(json_input)
+                            
+                            # Create credentials object
+                            credentials = service_account.Credentials.from_service_account_info(
+                                credentials_dict,
+                                scopes=["https://www.googleapis.com/auth/cloud-platform"]
+                            )
+                            st.session_state.api_keys['google_credentials'] = credentials
+                            st.success("✅ Google credentials loaded successfully!")
+                        except json.JSONDecodeError:
+                            st.error("Invalid JSON format. Please paste valid service account JSON.")
                             st.session_state.api_keys['google_credentials'] = None
-                            return False
-                        
-                        # Parse the JSON
-                        credentials_dict = json.loads(json_input)
-                        
-                        # Create credentials object
-                        credentials = service_account.Credentials.from_service_account_info(
-                            credentials_dict,
-                            scopes=["https://www.googleapis.com/auth/cloud-platform"]
-                        )
-                        st.session_state.api_keys['google_credentials'] = credentials
-                        st.success("✅ Google credentials loaded successfully!")
-                    except json.JSONDecodeError:
-                        st.error("Invalid JSON format. Please paste valid service account JSON.")
-                        st.session_state.api_keys['google_credentials'] = None
-                    except Exception as e:
-                        st.error(f"Error loading credentials: {e}")
-                        st.session_state.api_keys['google_credentials'] = None
+                        except Exception as e:
+                            st.error(f"Error loading credentials: {e}")
+                            st.session_state.api_keys['google_credentials'] = None
             
                 elif auth_method == "Upload Service Account JSON File":
                     uploaded_file = st.file_uploader(
-                    "Upload Service Account JSON",
-                    type=['json'],
-                    help="Upload your Google Cloud service account credentials JSON file"
-                )
+                        "Upload Service Account JSON",
+                        type=['json'],
+                        help="Upload your Google Cloud service account credentials JSON file"
+                    )
                     if uploaded_file:
-                    try:
-                        # Import Google auth libraries
                         try:
-                            from google.oauth2 import service_account
-                        except ImportError:
-                            st.error("Google Cloud libraries not installed. Run: pip install google-cloud-bigquery")
+                            # Import Google auth libraries
+                            try:
+                                from google.oauth2 import service_account
+                            except ImportError:
+                                st.error("Google Cloud libraries not installed. Run: pip install google-cloud-bigquery")
+                                st.session_state.api_keys['google_credentials'] = None
+                                return False
+                            
+                            # Read and parse the JSON file
+                            credentials_dict = json.loads(uploaded_file.read())
+                            
+                            # Create credentials object
+                            credentials = service_account.Credentials.from_service_account_info(
+                                credentials_dict,
+                                scopes=["https://www.googleapis.com/auth/cloud-platform"]
+                            )
+                            st.session_state.api_keys['google_credentials'] = credentials
+                            st.success("✅ Google credentials loaded successfully!")
+                        except Exception as e:
+                            st.error(f"Error loading credentials: {e}")
                             st.session_state.api_keys['google_credentials'] = None
-                            return False
-                        
-                        # Read and parse the JSON file
-                        credentials_dict = json.loads(uploaded_file.read())
-                        
-                        # Create credentials object
-                        credentials = service_account.Credentials.from_service_account_info(
-                            credentials_dict,
-                            scopes=["https://www.googleapis.com/auth/cloud-platform"]
-                        )
-                        st.session_state.api_keys['google_credentials'] = credentials
-                        st.success("✅ Google credentials loaded successfully!")
-                    except Exception as e:
-                        st.error(f"Error loading credentials: {e}")
-                        st.session_state.api_keys['google_credentials'] = None
             
                 else:  # Use Public BigQuery
-                st.warning("⚠️ Using public BigQuery access has limitations and may not work for all queries")
-                st.info("For full access, please use a service account")
-                st.session_state.api_keys['google_credentials'] = None
+                    st.warning("⚠️ Using public BigQuery access has limitations and may not work for all queries")
+                    st.info("For full access, please use a service account")
+                    st.session_state.api_keys['google_credentials'] = None
             
                 # Instructions on how to get service account
                 with st.expander("📖 How to get a Service Account JSON for BigQuery"):
