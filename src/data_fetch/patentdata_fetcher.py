@@ -657,10 +657,10 @@ class GooglePatentPuller:
 
     def __init__(self, cpc_parser: CPCParser, project_id: str | None = None, credentials: Any = None) -> None:
         self.project_id = project_id if project_id else os.getenv('BIGQUERY_PROJECT_ID')
-        if not self.project_id:
+        if not self.project_id or not self.project_id.strip():
             raise ValueError(
-                "BigQuery project ID not found. "
-                "Please provide project_id parameter or set BIGQUERY_PROJECT_ID environment variable."
+                "BigQuery project ID not found or empty. "
+                "Please provide a valid project_id parameter."
             )
         self.cpc_parser = cpc_parser
         self.credentials = credentials
@@ -675,9 +675,11 @@ class GooglePatentPuller:
                 if self.credentials:
                     # Use provided credentials
                     self.client = bigquery.Client(project=self.project_id, credentials=self.credentials)
+                    logger.info(f"BigQuery client initialized with provided credentials for project: {self.project_id}")
                 else:
                     # Try to use application default credentials
                     self.client = bigquery.Client(project=self.project_id)
+                    logger.info(f"BigQuery client initialized with default credentials for project: {self.project_id}")
             except Exception as e:
                 logger.error(f"Failed to initialize BigQuery client: {e}")
                 raise ValueError(
@@ -930,16 +932,18 @@ class HybridPatentPuller:
         self.uspto_puller = USPTOPatentPuller(cpc_parser, api_key=uspto_api_key)
         logger.info("USPTO API initialized for US patents (FREE)")
 
-        # BigQuery puller
-        if google_project_id:
+        # BigQuery puller - only initialize if we have a valid project ID
+        self.bigquery_puller = None
+        if google_project_id and google_project_id.strip():
             try:
                 self.bigquery_puller = GooglePatentPuller(cpc_parser, project_id=google_project_id, credentials=google_credentials)
                 logger.info("BigQuery initialized for international patents")
             except Exception as e:
-                logger.error(f"BigQuery initialization failed: {e}")
+                logger.warning(f"BigQuery initialization skipped: {e}")
+                logger.info("Continuing with USPTO data only")
                 self.bigquery_puller = None
         else:
-            logger.info("No Google project ID provided, skipping BigQuery initialization")
+            logger.info("No Google project ID provided, using USPTO data only")
             self.bigquery_puller = None
 
     def pull_patents_recent_first(self, companies: list[str], 
