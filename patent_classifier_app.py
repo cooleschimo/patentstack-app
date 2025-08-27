@@ -385,18 +385,20 @@ def create_cpc_configuration_ui():
     
     # Edit existing domains
     if st.session_state.cpc_config['domains']:
-        col1, col2 = st.columns([3, 1])
+        col1, col2, col3 = st.columns([3, 1, 1])
         with col1:
             selected_domain = st.selectbox(
                 "Select domain to edit",
                 options=list(st.session_state.cpc_config['domains'].keys())
             )
-        with col2:
-            if st.button("🗑️ Delete Domain", type="secondary"):
-                if selected_domain in st.session_state.cpc_config['domains']:
+        with col3:
+            if st.button("🗑️ Delete Domain", key="delete_domain"):
+                if len(st.session_state.cpc_config['domains']) > 1:
                     del st.session_state.cpc_config['domains'][selected_domain]
                     st.success(f"Deleted domain: {selected_domain}")
                     st.rerun()
+                else:
+                    st.warning("Cannot delete the last domain")
         
         if selected_domain and selected_domain in st.session_state.cpc_config['domains']:
             st.markdown(f"##### Editing: {selected_domain}")
@@ -425,17 +427,44 @@ def create_cpc_configuration_ui():
                         st.success(f"Added CPC code: {new_cpc}")
                         st.rerun()
             
-            # Display existing CPC codes
+            # Display existing CPC codes with delete option
             if domain_data.get('cpc_codes'):
-                st.markdown("**Existing CPC Codes:**")
-                cpc_df = pd.DataFrame([
-                    {
-                        'CPC Code': c['code'] if isinstance(c, dict) else c,
-                        'Description': c.get('description', '') if isinstance(c, dict) else ''
-                    }
-                    for c in domain_data['cpc_codes']
-                ])
-                st.dataframe(cpc_df, use_container_width=True)
+                col_title, col_clear = st.columns([3, 1])
+                with col_title:
+                    st.markdown("**Existing CPC Codes:**")
+                with col_clear:
+                    if st.button("Clear All", key=f"clear_all_{selected_domain}"):
+                        st.session_state.cpc_config['domains'][selected_domain]['cpc_codes'] = []
+                        st.success("Cleared all CPC codes")
+                        st.rerun()
+                
+                # Create columns for each CPC code with delete button
+                for idx, cpc in enumerate(domain_data['cpc_codes']):
+                    col1, col2, col3 = st.columns([2, 4, 1])
+                    with col1:
+                        code = cpc['code'] if isinstance(cpc, dict) else cpc
+                        st.text(code)
+                    with col2:
+                        desc = cpc.get('description', '') if isinstance(cpc, dict) else ''
+                        st.text(desc if desc else "No description")
+                    with col3:
+                        if st.button("🗑️", key=f"del_{selected_domain}_{idx}", help=f"Delete {code}"):
+                            # Remove the CPC code
+                            st.session_state.cpc_config['domains'][selected_domain]['cpc_codes'].pop(idx)
+                            st.success(f"Deleted CPC code: {code}")
+                            st.rerun()
+                
+                # Also show as dataframe for easy viewing
+                if len(domain_data['cpc_codes']) > 5:
+                    with st.expander("View all as table"):
+                        cpc_df = pd.DataFrame([
+                            {
+                                'CPC Code': c['code'] if isinstance(c, dict) else c,
+                                'Description': c.get('description', '') if isinstance(c, dict) else ''
+                            }
+                            for c in domain_data['cpc_codes']
+                        ])
+                        st.dataframe(cpc_df, use_container_width=True)
     
     # Update session state
     st.session_state.cpc_config['user_inputs']['companies'] = companies
@@ -605,14 +634,21 @@ def fetch_patent_data():
                 st.markdown("### Sample Data")
                 st.dataframe(combined_df.head(), use_container_width=True)
                 
-                # Offer download
-                csv_data = combined_df.to_csv(index=False)
-                st.download_button(
-                    label="📥 Download Patent Data",
-                    data=csv_data,
-                    file_name=f"patents_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                    mime="text/csv"
-                )
+                # Offer download with clear labeling
+                st.markdown("### 💾 Save Your Data")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.info("**Raw Data**: Contains all fetched patents before cleaning")
+                    csv_data = combined_df.to_csv(index=False)
+                    st.download_button(
+                        label="📥 Download Raw Patent Data",
+                        data=csv_data,
+                        file_name=f"raw_patents_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv",
+                        help="Save this file to reload later without re-fetching from APIs"
+                    )
+                with col2:
+                    st.warning("💡 **Tip**: Save this file to avoid re-fetching data if the app reloads!")
             else:
                 progress_bar.progress(100)
                 if fetch_errors:
@@ -632,8 +668,65 @@ def clean_and_deduplicate_data():
     """UI for cleaning and deduplicating patent data"""
     st.markdown("## 🧹 Step 3: Clean and Deduplicate Data")
     
+    # Option to upload previously saved cleaned data
+    st.markdown("### 📤 Upload Previously Cleaned Data (Optional)")
+    uploaded_file = st.file_uploader(
+        "Upload a cleaned patents CSV file to skip data fetching",
+        type=['csv'],
+        help="If you've previously downloaded cleaned data, upload it here to go directly to ML classification"
+    )
+    
+    if uploaded_file is not None:
+        try:
+            uploaded_df = pd.read_csv(uploaded_file)
+            required_columns = ['patent_id', 'title', 'abstract']
+            missing_columns = [col for col in required_columns if col not in uploaded_df.columns]
+            
+            if missing_columns:
+                st.error(f"Uploaded file is missing required columns: {missing_columns}")
+                st.info("Required columns: patent_id, title, abstract, assignee (optional)")
+            else:
+                st.success(f"✅ Loaded {len(uploaded_df)} patents from uploaded file")
+                
+                # Store as cleaned data directly
+                st.session_state.cleaned_data = uploaded_df
+                st.session_state.fetched_data = uploaded_df  # Also store as fetched for compatibility
+                
+                # Show data summary
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Total Patents", len(uploaded_df))
+                with col2:
+                    unique_companies = uploaded_df['assignee'].nunique() if 'assignee' in uploaded_df.columns else "N/A"
+                    st.metric("Unique Companies", unique_companies)
+                with col3:
+                    date_range = "N/A"
+                    if 'date' in uploaded_df.columns:
+                        try:
+                            dates = pd.to_datetime(uploaded_df['date'])
+                            date_range = f"{dates.min().year}-{dates.max().year}"
+                        except:
+                            pass
+                    st.metric("Date Range", date_range)
+                with col4:
+                    missing_abstracts = uploaded_df['abstract'].isna().sum() if 'abstract' in uploaded_df.columns else 0
+                    st.metric("Missing Abstracts", missing_abstracts)
+                
+                # Show sample data
+                with st.expander("Preview uploaded data"):
+                    st.dataframe(uploaded_df.head(10), use_container_width=True)
+                
+                st.info("💡 You can now skip to Step 4 to define classifications and run ML")
+                return st.session_state.cleaned_data
+                
+        except Exception as e:
+            st.error(f"Error loading uploaded file: {str(e)}")
+            st.info("Please ensure the file is a valid CSV with required columns")
+    
+    st.markdown("---")
+    
     if st.session_state.fetched_data is None:
-        st.warning("Please fetch patent data first!")
+        st.warning("Please fetch patent data first or upload a cleaned CSV file!")
         return None
     
     df = st.session_state.fetched_data.copy()
@@ -700,57 +793,180 @@ def clean_and_deduplicate_data():
             if 'company_mapping' not in st.session_state:
                 st.session_state.company_mapping = {}
             
+            # Common company abbreviations mapping
+            COMPANY_ABBREVIATIONS = {
+                "IBM": ["INTERNATIONAL BUSINESS MACHINES", "INTL BUSINESS MACHINES"],
+                "GE": ["GENERAL ELECTRIC"],
+                "HP": ["HEWLETT PACKARD", "HEWLETT-PACKARD"],
+                "P&G": ["PROCTER GAMBLE", "PROCTER AND GAMBLE"],
+                "J&J": ["JOHNSON JOHNSON"],
+                "AT&T": ["AMERICAN TELEPHONE TELEGRAPH", "ATT"],
+            }
+            
             # Quick auto-detect button
             if st.button("🔍 Auto-detect Company Variations"):
                 # Clear existing mappings before auto-detecting
                 st.session_state.company_mapping = {}
                 for target_company in configured_companies:
-                    normalized_target = normalize_company_name(target_company)
+                    normalized_target = normalize_company_name(target_company).upper()
                     auto_matches = []
+                    
                     for assignee in unique_assignees:
-                        normalized_assignee = normalize_company_name(assignee)
-                        # More aggressive matching for auto-detect
-                        if (normalized_target in normalized_assignee and 
-                            assignee != target_company):
+                        if assignee == target_company:
+                            continue
+                            
+                        normalized_assignee = normalize_company_name(assignee).upper()
+                        
+                        # Check if it's a known abbreviation
+                        is_match = False
+                        for abbrev, full_names in COMPANY_ABBREVIATIONS.items():
+                            if abbrev in normalized_target:
+                                for full_name in full_names:
+                                    if full_name in normalized_assignee:
+                                        is_match = True
+                                        break
+                            elif any(full_name in normalized_target for full_name in full_names):
+                                if abbrev in normalized_assignee:
+                                    is_match = True
+                        
+                        # Standard matching
+                        if not is_match:
+                            if normalized_target in normalized_assignee:
+                                is_match = True
+                        
+                        if is_match:
                             auto_matches.append(assignee)
+                    
                     if auto_matches:
                         st.session_state.company_mapping[target_company] = auto_matches
+                        
                 if st.session_state.company_mapping:
                     st.success("✅ Auto-detected potential variations. Review and adjust below.")
                 else:
                     st.info("No variations detected. Company names may already be consolidated.")
                 st.rerun()
             
+            # Option 1: Manual consolidation - combine ANY companies
+            st.markdown("##### Manual Consolidation")
+            st.write("Select a primary company name and merge others into it:")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                # Select primary company (what to keep)
+                primary_company = st.selectbox(
+                    "Primary company name (keep this):",
+                    options=[""] + list(unique_assignees),
+                    key="primary_company"
+                )
+            
+            if primary_company:
+                with col2:
+                    # Get all other companies including configured ones
+                    all_other_companies = [c for c in unique_assignees if c != primary_company]
+                    
+                    # Include configured companies that aren't the primary
+                    for config_company in configured_companies:
+                        if config_company != primary_company and config_company not in all_other_companies:
+                            all_other_companies.append(config_company)
+                    
+                    # Select companies to merge
+                    companies_to_merge = st.multiselect(
+                        f"Merge these into '{primary_company}':",
+                        options=all_other_companies,
+                        key=f"merge_into_{primary_company}",
+                        help="Select all company variations to consolidate"
+                    )
+                
+                if companies_to_merge:
+                    if st.button("Apply Manual Consolidation", type="primary", key="manual_consolidate"):
+                        # Apply the consolidation
+                        for company in companies_to_merge:
+                            df.loc[df['assignee'] == company, 'assignee'] = primary_company
+                        st.session_state.fetched_data['assignee'] = df['assignee']
+                        st.success(f"✅ Consolidated {len(companies_to_merge)} companies into '{primary_company}'")
+                        st.rerun()
+            
+            st.markdown("---")
+            
+            # Option 2: Auto-detect variations for configured companies
+            st.markdown("##### Auto-Detect Variations")
+            st.write("Find variations of your configured companies:")
+            
+            # Define common company abbreviations and their full names
+            COMPANY_ABBREVIATIONS = {
+                "IBM": ["INTERNATIONAL BUSINESS MACHINES", "INTL BUSINESS MACHINES", "INT BUSINESS MACHINES"],
+                "GE": ["GENERAL ELECTRIC", "GENERAL ELEC"],
+                "HP": ["HEWLETT PACKARD", "HEWLETT-PACKARD"],
+                "AT&T": ["AMERICAN TELEPHONE AND TELEGRAPH", "AMERICAN TEL & TEL"],
+                "P&G": ["PROCTER AND GAMBLE", "PROCTER & GAMBLE"],
+                "J&J": ["JOHNSON AND JOHNSON", "JOHNSON & JOHNSON"],
+                "GM": ["GENERAL MOTORS"],
+                "3M": ["MINNESOTA MINING AND MANUFACTURING", "MINNESOTA MINING & MANUFACTURING"],
+            }
+            
             # For each configured company, find potential matches
             for target_company in configured_companies:
                 st.markdown(f"**{target_company}**")
                 normalized_target = normalize_company_name(target_company)
                 
-                # Find all assignees that might be variations of this company
+                # Find all assignees that might be variations
                 potential_matches = []
                 for assignee in unique_assignees:
+                    if assignee == target_company:
+                        continue  # Skip self
+                    
                     normalized_assignee = normalize_company_name(assignee)
-                    # Check if the normalized assignee contains the target company name
-                    if (normalized_target in normalized_assignee or 
-                        normalized_assignee in normalized_target or
-                        # Also check if they share significant parts
-                        (len(normalized_target) > 3 and 
-                         len(normalized_assignee) > 3 and
-                         normalized_target[:4] == normalized_assignee[:4])):
-                        if assignee != target_company:
-                            potential_matches.append(assignee)
+                    is_potential_match = False
+                    
+                    # Check if this is a known abbreviation pattern
+                    for abbrev, full_names in COMPANY_ABBREVIATIONS.items():
+                        if abbrev in normalized_target.upper():
+                            # Check if assignee matches any full name
+                            for full_name in full_names:
+                                if full_name in normalized_assignee.upper():
+                                    is_potential_match = True
+                                    break
+                        elif any(full_name in normalized_target.upper() for full_name in full_names):
+                            # Check if assignee matches abbreviation
+                            if abbrev in normalized_assignee.upper():
+                                is_potential_match = True
+                    
+                    # If not matched by abbreviation, check other patterns
+                    if not is_potential_match:
+                        # Direct containment (one name contains the other)
+                        if len(normalized_target) > 3 and len(normalized_assignee) > 3:
+                            if normalized_target in normalized_assignee or normalized_assignee in normalized_target:
+                                is_potential_match = True
+                            # Starting characters match (e.g., "MICROSOFT" and "MICROSOFT TECHNOLOGY")
+                            elif normalized_target[:min(4, len(normalized_target))] == normalized_assignee[:min(4, len(normalized_assignee))]:
+                                is_potential_match = True
+                    
+                    # Special check: Include configured companies that are variations
+                    # This allows consolidating IBM with International Business Machines even if both are configured
+                    if assignee in configured_companies and not is_potential_match:
+                        # Check abbreviation patterns between configured companies
+                        for abbrev, full_names in COMPANY_ABBREVIATIONS.items():
+                            if abbrev in normalized_target.upper() and any(fn in normalized_assignee.upper() for fn in full_names):
+                                is_potential_match = True
+                                break
+                            elif any(fn in normalized_target.upper() for fn in full_names) and abbrev in normalized_assignee.upper():
+                                is_potential_match = True
+                                break
+                    
+                    if is_potential_match:
+                        potential_matches.append(assignee)
                 
                 if potential_matches:
-                    # Show potential matches with checkboxes
-                    # Filter default values to only include those that still exist in potential_matches
+                    # Include ALL potential matches, even other configured companies
                     current_defaults = st.session_state.company_mapping.get(target_company, [])
                     valid_defaults = [d for d in current_defaults if d in potential_matches]
                     
                     selected_matches = st.multiselect(
-                        f"Select variations to combine into '{target_company}':",
+                        f"Select ALL variations to combine into '{target_company}':",
                         options=potential_matches,
                         default=valid_defaults,
-                        key=f"combine_{target_company}"
+                        key=f"combine_{target_company}",
+                        help="This includes other companies from your config if they match"
                     )
                     st.session_state.company_mapping[target_company] = selected_matches
                 else:
@@ -899,14 +1115,22 @@ def clean_and_deduplicate_data():
             st.markdown("### Sample of Cleaned Data")
             st.dataframe(cleaned_df.head(), use_container_width=True)
             
-            # Offer download
-            csv_data = cleaned_df.to_csv(index=False)
-            st.download_button(
-                label="📥 Download Cleaned Data",
-                data=csv_data,
-                file_name=f"cleaned_patents_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                mime="text/csv"
-            )
+            # Offer download with clear labeling
+            st.markdown("### 💾 Save Cleaned Data")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.success("**Cleaned Data**: Ready for ML classification")
+                csv_data = cleaned_df.to_csv(index=False)
+                st.download_button(
+                    label="📥 Download Cleaned Patents",
+                    data=csv_data,
+                    file_name=f"cleaned_patents_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                    mime="text/csv",
+                    type="primary",
+                    help="Save this file to reload directly into ML classification later"
+                )
+            with col2:
+                st.info("💡 **Tip**: This cleaned file can be uploaded directly to Step 3 or Quick Start to skip data fetching!")
     
     # Option to save to database (future enhancement)
     with st.expander("💾 Storage Options", expanded=False):
@@ -1244,14 +1468,22 @@ def create_classification_ui():
             avg_confidence = classified_df['confidence'].mean()
             st.metric("Average Confidence", f"{avg_confidence:.2%}")
         
-        # Offer download
-        csv_data = classified_df.to_csv(index=False)
-        st.download_button(
-            label="📥 Download Classified Patents",
-            data=csv_data,
-            file_name=f"classified_patents_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv"
-        )
+        # Offer download with comprehensive data
+        st.markdown("### 💾 Save Classification Results")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.success("**Complete Results**: Includes all data + classifications")
+            csv_data = classified_df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Complete Classified Patents",
+                data=csv_data,
+                file_name=f"classified_patents_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                type="primary",
+                help="Contains all patent data plus tech stack classifications and confidence scores"
+            )
+        with col2:
+            st.info("💡 This file contains everything - original data + ML classifications. Perfect for analysis in Excel or other tools!")
         
         return classified_df
     
@@ -1400,6 +1632,43 @@ def main():
     """Main application"""
     st.title("🔬 PatentStack")
     st.markdown("### Classify patents into technology stack categories")
+    st.markdown("---")
+    
+    # Quick start option
+    with st.expander("⚡ Quick Start - Upload Cleaned Data", expanded=False):
+        st.info("Have a cleaned CSV from a previous session? Upload it here to skip data fetching!")
+        quick_upload = st.file_uploader(
+            "Upload cleaned patents CSV",
+            type=['csv'],
+            key="quick_upload",
+            help="Required columns: patent_id, title, abstract"
+        )
+        
+        if quick_upload is not None:
+            try:
+                df = pd.read_csv(quick_upload)
+                required_cols = ['patent_id', 'title', 'abstract']
+                if all(col in df.columns for col in required_cols):
+                    st.session_state.cleaned_data = df
+                    st.session_state.fetched_data = df
+                    st.success(f"✅ Loaded {len(df)} patents! Go to Step 4 to classify.")
+                    
+                    # Show quick stats
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Patents", len(df))
+                    with col2:
+                        companies = df['assignee'].nunique() if 'assignee' in df.columns else "N/A"
+                        st.metric("Companies", companies)
+                    with col3:
+                        missing = df['abstract'].isna().sum()
+                        st.metric("Missing Abstracts", missing)
+                else:
+                    st.error(f"Missing required columns. Found: {list(df.columns)}")
+                    st.info("Required: patent_id, title, abstract")
+            except Exception as e:
+                st.error(f"Error loading file: {str(e)}")
+    
     st.markdown("---")
     
     # Sidebar navigation
