@@ -121,7 +121,10 @@ class USPTOPatentPuller:
     
     def __init__(self, cpc_parser: CPCParser, api_key: str | None = None):
         self.cpc_parser = cpc_parser
-        self.api_key: str = api_key if api_key else self._get_api_key()
+        if api_key:
+            self.api_key: str = api_key
+        else:
+            self.api_key: str = self._get_api_key()
         
         # PatentsView API settings
         self.base_url: str = "https://search.patentsview.org/api/v1"

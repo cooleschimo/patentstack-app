@@ -333,7 +333,7 @@ def fetch_patent_data():
             cpc_parser = CPCParser(str(config_path))
             puller = HybridPatentPuller(
                 cpc_parser,
-                uspto_api_key=st.session_state.api_keys['uspto_key'],
+                uspto_api_key=st.session_state.api_keys['uspto_key'] if st.session_state.api_keys['uspto_key'] else None,
                 google_project_id=st.session_state.api_keys['google_project_id'] if st.session_state.api_keys['google_project_id'] else None
             )
             
