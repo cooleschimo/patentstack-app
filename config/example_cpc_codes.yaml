@@ -1,0 +1,50 @@
+# Example CPC Configuration File
+# This shows how to configure technology domains and CPC codes
+
+domains:
+  quantum_computing:
+    description: "Quantum information processing and computing technologies"
+    cpc_codes:
+      - code: "G06N10"
+        description: "Quantum computing - quantum algorithms and processing"
+      - code: "H04L9"
+        description: "Quantum cryptography and secure communication"
+      - code: "H01L39"
+        description: "Superconducting devices for quantum systems"
+      - code: "G01R33"
+        description: "Quantum sensing and measurement"
+  
+  artificial_intelligence:
+    description: "Machine learning and AI technologies"
+    cpc_codes:
+      - code: "G06N3"
+        description: "Neural networks and deep learning"
+      - code: "G06N20"
+        description: "Machine learning algorithms"
+      - code: "G06F40"
+        description: "Natural language processing"
+      - code: "G06V10"
+        description: "Computer vision and image recognition"
+  
+  biotechnology:
+    description: "Biological and medical technologies"
+    cpc_codes:
+      - code: "C12N"
+        description: "Genetic engineering and modification"
+      - code: "C12Q"
+        description: "Measuring or testing with enzymes/microorganisms"
+      - code: "A61K"
+        description: "Medical preparations and compounds"
+      - code: "G16B"
+        description: "Bioinformatics"
+
+user_inputs:
+  companies:
+    - IBM
+    - Google
+    - Microsoft
+    - Apple
+    - Amazon
+  date_range:
+    start_year: 2020
+    end_year: 2024
