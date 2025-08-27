@@ -329,9 +329,13 @@ def fetch_patent_data():
             # Save config and use it
             config_path = save_config_to_yaml(st.session_state.cpc_config)
             
-            # Initialize fetcher
+            # Initialize fetcher with API keys from session state
             cpc_parser = CPCParser(str(config_path))
-            puller = HybridPatentPuller(cpc_parser)
+            puller = HybridPatentPuller(
+                cpc_parser,
+                uspto_api_key=st.session_state.api_keys['uspto_key'],
+                google_project_id=st.session_state.api_keys['google_project_id'] if st.session_state.api_keys['google_project_id'] else None
+            )
             
             # Get parameters
             companies = st.session_state.cpc_config['user_inputs']['companies']
